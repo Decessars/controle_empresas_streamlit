@@ -1514,7 +1514,7 @@ def render_empresas() -> None:
         st.session_state["empresas_view_mode"] = "ativas"
 
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns([2.1, 1.2, 0.8, 0.8])
+        c1, c2, c3, c4 = st.columns([2.3, 1.2, 0.8, 0.8])
         search = c1.text_input("Buscar", value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder="Buscar")
         regime_filter = c2.selectbox("Regime", ["Todos", *REGIMES], index=0, label_visibility="collapsed")
         if c3.button("Ativas"):
@@ -1545,10 +1545,17 @@ def render_empresas() -> None:
 
     display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
+
+    if editable_mode:
+        save_col, _ = st.columns([0.18, 0.82])
+        save_clicked = save_col.button("?? Salvar", use_container_width=True)
+    else:
+        save_clicked = False
+
     edited_df = show_table(
         display_df,
         key="empresas_editor",
-        height=420,
+        height=620,
         editable=editable_mode,
         disabled=["id"],
         column_config={
@@ -1568,7 +1575,7 @@ def render_empresas() -> None:
         st.info("Nenhuma empresa encontrada.")
         return
 
-    if editable_mode and st.button("?? Salvar"):
+    if editable_mode and save_clicked:
         try:
             changed = 0
             original = display_df.set_index("id")
@@ -1596,6 +1603,7 @@ def render_empresas() -> None:
             st.error(f"N?o foi poss?vel salvar as altera??es. Detalhe: {exc}")
     elif not editable_mode:
         st.caption("Exibindo somente empresas exclu?das.")
+
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
