@@ -377,6 +377,27 @@ def apply_nexus_theme() -> None:
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"] {
             margin-bottom: 0.45rem;
+            background: #ffffff !important;
+            border: 1px solid rgba(91,33,182,.24) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 1px 0 rgba(15,23,42,.03) inset;
+            padding: 0.15rem 0.4rem !important;
+        }
+        .st-key-login_card div[data-testid="stTextInputRootElement"]:focus-within {
+            border-color: rgba(91,33,182,.52) !important;
+            box-shadow: 0 0 0 3px rgba(91,33,182,.10) !important;
+        }
+        .st-key-login_card div[data-testid="stTextInputRootElement"] input {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            padding: 0.35rem 0.35rem !important;
+            min-height: 34px !important;
+        }
+        .st-key-login_card label {
+            margin-bottom: 0.2rem !important;
+            font-weight: 700 !important;
+            color: var(--nexus-text) !important;
         }
         .st-key-login_card .stButton > button,
         .st-key-login_card div[data-testid="stFormSubmitButton"] button {
