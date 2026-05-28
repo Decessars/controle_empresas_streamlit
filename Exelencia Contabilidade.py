@@ -1077,6 +1077,10 @@ def require_login() -> bool:
         return False
 
     if st.session_state.get("authenticated"):
+        if "page_label" not in st.session_state:
+            st.session_state["page_label"] = "🏠 Módulos"
+        if "page" not in st.session_state:
+            st.session_state["page"] = "Módulos"
         with st.sidebar:
             user = st.session_state.get("auth_user", "")
             if user:
@@ -1104,6 +1108,9 @@ def require_login() -> bool:
         if users.get(user) == password:
             st.session_state["authenticated"] = True
             st.session_state["auth_user"] = user
+            st.session_state["page_label"] = "🏠 Módulos"
+            st.session_state["page"] = "Módulos"
+            st.query_params["page"] = "Módulos"
             st.rerun()
         else:
             st.error("Usuário ou senha inválidos.")
