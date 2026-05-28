@@ -188,6 +188,18 @@ def apply_nexus_theme() -> None:
             color: var(--nexus-text) !important;
             letter-spacing: 0;
         }
+        h1 {
+            font-size: 2rem !important;
+            line-height: 1.1 !important;
+        }
+        h2 {
+            font-size: 1.35rem !important;
+            line-height: 1.15 !important;
+        }
+        h3 {
+            font-size: 1.1rem !important;
+            line-height: 1.15 !important;
+        }
         p, label, span, div {
             letter-spacing: 0;
         }
@@ -203,6 +215,16 @@ def apply_nexus_theme() -> None:
         }
         div[data-testid="stDataFrame"], div[data-testid="stForm"], div[data-testid="stExpander"] {
             border-radius: 12px;
+        }
+        div[data-testid="stExpander"] {
+            margin-bottom: 0.6rem !important;
+        }
+        div[data-testid="stExpander"] summary {
+            padding-top: 0.35rem !important;
+            padding-bottom: 0.35rem !important;
+        }
+        div[data-testid="stExpander"] div[role="button"] {
+            min-height: 2rem !important;
         }
         .stButton > button, .stDownloadButton > button, div[data-testid="stFormSubmitButton"] button {
             background: var(--nexus-primary);
@@ -1669,10 +1691,11 @@ def render_demandas(competencia: str) -> None:
         return
 
     with st.expander("Criar demandas", expanded=False):
-        tipo_option = st.selectbox("Tipo", demand_options())
+        c1, c2 = st.columns([1, 2])
+        tipo_option = c1.selectbox("Tipo", demand_options())
         tipo = option_to_code(tipo_option)
         choices = empresas["id"].tolist()
-        selected = st.multiselect(
+        selected = c2.multiselect(
             "Empresas",
             choices,
             format_func=lambda eid: empresas.loc[empresas["id"] == eid, "razao_social"].iloc[0],
@@ -1687,8 +1710,9 @@ def render_demandas(competencia: str) -> None:
         st.info("Sem demandas nesta competência.")
         return
 
-    tipo_filter = st.selectbox("Filtrar tipo", ["Todos", *[label for _, label in DEMAND_TYPES]])
-    status_filter = st.selectbox("Filtrar status", ["Todos", "Pendentes", "Concluídas"])
+    f1, f2 = st.columns(2)
+    tipo_filter = f1.selectbox("Filtrar tipo", ["Todos", *[label for _, label in DEMAND_TYPES]])
+    status_filter = f2.selectbox("Filtrar status", ["Todos", "Pendentes", "Concluídas"])
     filtered = demandas.copy()
     if tipo_filter != "Todos":
         code = next(code for code, label in DEMAND_TYPES if label == tipo_filter)
