@@ -1706,11 +1706,11 @@ def main() -> None:
     render_topbar()
     st.title("Controle de Empresas")
 
+    init_db()
     if not db_exists():
         render_setup()
         return
 
-    init_db()
     page, competencia = render_sidebar()
 
     if page == "Módulos":

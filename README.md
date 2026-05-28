@@ -85,6 +85,8 @@ Se nenhum usuario for configurado via `st.secrets` ou variaveis de ambiente, o a
 
 O app também mantém o arquivo `usuarios_senhas.txt` sincronizado com as credenciais carregadas.
 
+Se não existir banco na nuvem, o app cria automaticamente um SQLite vazio na primeira execução. Os dados reais continuam dependendo da importação do `cnpjs.db` local ou de um PostgreSQL online.
+
 ## Atenção sobre dados reais
 
 Não publique `data/cnpjs.db` em repositório público. Ele pode conter CNPJs, dados de clientes e credenciais.
