@@ -1063,6 +1063,12 @@ def normalize_cnpj(value: str) -> str:
     return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
 
 
+def clean_cell(value) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
 def load_empresas(active_only: bool = True) -> pd.DataFrame:
     active_expr = "COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END)"
     where = f"WHERE {active_expr}=1" if active_only else ""
@@ -1239,6 +1245,7 @@ def record_empresa_history(empresa_id: int, action: str, before: dict, after: di
         if str(before.get(key, "")) != str(after.get(key, "")):
             changed_fields.append(label)
     summary = ", ".join(changed_fields) if changed_fields else action
+    usuario = str(st.session_state.get("auth_user", "")).strip() or "sistema"
     execute(
         """
         INSERT INTO historico_empresas
@@ -1248,7 +1255,7 @@ def record_empresa_history(empresa_id: int, action: str, before: dict, after: di
         (
             int(empresa_id),
             action,
-            current_user(),
+            usuario,
             summary,
             json.dumps(before, ensure_ascii=False),
             json.dumps(after, ensure_ascii=False),
@@ -1889,16 +1896,16 @@ def render_empresas() -> None:
                     continue
                 orig_row = original.loc[empresa_id]
                 payload = {
-                    "cnpj": str(edited_row.get("cnpj", "")),
-                    "razao_social": str(edited_row.get("razao_social", "")),
-                    "nome_fantasia": str(edited_row.get("nome_fantasia", "")),
-                    "apelido": str(edited_row.get("apelido", "")),
-                    "regime": str(edited_row.get("regime", "")),
-                    "mensalidade": str(edited_row.get("mensalidade", "")),
-                    "cidade": str(edited_row.get("cidade", "")),
-                    "uf": str(edited_row.get("uf", "")),
+                    "cnpj": clean_cell(edited_row.get("cnpj", "")),
+                    "razao_social": clean_cell(edited_row.get("razao_social", "")),
+                    "nome_fantasia": clean_cell(edited_row.get("nome_fantasia", "")),
+                    "apelido": clean_cell(edited_row.get("apelido", "")),
+                    "regime": clean_cell(edited_row.get("regime", "")),
+                    "mensalidade": clean_cell(edited_row.get("mensalidade", "")),
+                    "cidade": clean_cell(edited_row.get("cidade", "")),
+                    "uf": clean_cell(edited_row.get("uf", "")),
                 }
-                if any(str(payload[key]) != str(orig_row[key]) for key in payload):
+                if any(payload[key] != clean_cell(orig_row[key]) for key in payload):
                     save_empresa(payload, empresa_id)
                     changed += 1
             if changed:
