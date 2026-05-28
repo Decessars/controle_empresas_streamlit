@@ -81,7 +81,7 @@ funcionario = "outra-senha"
 url = "postgresql+psycopg://usuario:senha@host:5432/banco"
 ```
 
-Se nenhum usuário for configurado, o app abre sem login. Isso é útil localmente, mas não é recomendado para nuvem.
+Se nenhum usuario for configurado, o app bloqueia o acesso e mostra apenas a orientacao de configuracao. Isso evita expor exemplos de senha na interface publica.
 
 ## Atenção sobre dados reais
 

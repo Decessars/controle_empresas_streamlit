@@ -1029,16 +1029,13 @@ def require_login() -> bool:
                 """
                 <div class="login-brand"><span class="login-mark">D</span>DMLS Contabilidade</div>
                 <div class="login-title">Controle de Empresas</div>
-                <div class="login-subtitle">Login obrigatório. Configure usuários em secrets para liberar o acesso.</div>
+                <div class="login-subtitle">Acesso bloqueado. Configure usuarios em secrets ou variaveis de ambiente para liberar o acesso.</div>
                 """,
                 unsafe_allow_html=True,
             )
-            st.code(
-                """[auth.users]
-admin = "sua-senha-forte"
-funcionario = "outra-senha"
-""",
-                language="toml",
+            st.warning(
+                "Defina pelo menos um usuario em `.streamlit/secrets.toml` no formato `[auth.users]` "
+                "ou use `CONTROLE_EMPRESAS_USER` e `CONTROLE_EMPRESAS_PASSWORD`.",
             )
         return False
 
