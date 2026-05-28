@@ -1104,6 +1104,28 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
 
 
 
+
+
+def empresa_snapshot(row: dict | None) -> dict:
+    if not row:
+        return {}
+    data = dict(row)
+    return {
+        "id": int(data.get("id", 0) or 0),
+        "cnpj": str(data.get("cnpj", "") or ""),
+        "razao_social": str(data.get("razao_social", "") or ""),
+        "nome_fantasia": str(data.get("nome_fantasia", "") or ""),
+        "apelido": str(data.get("apelido", "") or ""),
+        "regime": str(data.get("regime", "") or ""),
+        "mensalidade": str(data.get("mensalidade", "") or ""),
+        "cidade": str(data.get("cidade", "") or ""),
+        "uf": str(data.get("uf", "") or ""),
+        "inativo": int(data.get("inativo", 0) or 0),
+        "is_ativo": int(data.get("is_ativo", 1) or 1),
+        "atualizado_em": str(data.get("atualizado_em", "") or ""),
+        "criado_em": str(data.get("criado_em", "") or ""),
+    }
+
 def load_empresa_history(empresa_id: int) -> pd.DataFrame:
     return query_df(
         """
