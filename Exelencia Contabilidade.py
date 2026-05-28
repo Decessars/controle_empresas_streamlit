@@ -128,16 +128,15 @@ def apply_nexus_theme() -> None:
             background-size: auto;
             color: var(--nexus-text);
         }
-        header[data-testid="stHeader"] {
-            background: rgba(244,247,251,.94) !important;
-            height: 0 !important;
-            backdrop-filter: blur(10px);
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"] {
+            display: none !important;
         }
         [data-testid="stDecoration"] {
             display: none !important;
         }
         .block-container {
-            padding-top: 0.6rem;
+            padding-top: 0.15rem;
             max-width: 1280px;
         }
         h1 {
