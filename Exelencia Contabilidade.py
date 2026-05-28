@@ -589,7 +589,7 @@ def render_topbar() -> None:
     st.markdown(
         """
         <div class="nexus-topbar">
-            <div class="nexus-brand">DMLS <span>Contab.</span></div>
+            <div class="nexus-brand">EXCELENCIA <span>CONTABILIDADE</span></div>
             <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">🖥️ Local</a>
         </div>
         """,
@@ -1064,7 +1064,7 @@ def require_login() -> bool:
         with st.container(border=True, key="login_card"):
             st.markdown(
                 """
-                <div class="login-brand"><span class="login-mark">D</span>DMLS Contabilidade</div>
+                <div class="login-brand"><span class="login-mark">E</span>Excelencia Contabilidade</div>
                 <div class="login-title">Controle de Empresas</div>
                 <div class="login-subtitle">Acesso bloqueado. Configure usuarios em secrets ou variaveis de ambiente para liberar o acesso.</div>
                 """,
@@ -1090,7 +1090,7 @@ def require_login() -> bool:
     with st.container(border=True, key="login_card"):
         st.markdown(
             """
-            <div class="login-brand"><span class="login-mark">D</span>DMLS Contabilidade</div>
+            <div class="login-brand"><span class="login-mark">E</span>Excelencia Contabilidade</div>
             <div class="login-title">Controle de Empresas</div>
             <div class="login-subtitle">Acesso restrito ao controle operacional.</div>
             """,
@@ -1152,7 +1152,7 @@ def render_modulos() -> None:
         """
         <div class="launcher-shell">
             <div class="launcher-kicker">●  Portal Principal • Seleção de Módulo</div>
-            <div class="launcher-title">Acesso ao SISTEMA DMLS</div>
+            <div class="launcher-title">Acesso ao SISTEMA EXCELENCIA CONTABILIDADE</div>
             <div class="launcher-subtitle">Selecione o ambiente de trabalho para iniciar sua operação.</div>
         </div>
         <div class="launcher-grid-wrap">
