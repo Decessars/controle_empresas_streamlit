@@ -83,6 +83,8 @@ url = "postgresql+psycopg://usuario:senha@host:5432/banco"
 
 Se nenhum usuario for configurado, o app bloqueia o acesso e mostra apenas a orientacao de configuracao. Isso evita expor exemplos de senha na interface publica.
 
+O app também gera localmente um arquivo `usuarios_senhas.txt` com o espelho das credenciais carregadas. Esse TXT é ignorado no Git e serve apenas como referência local.
+
 ## Atenção sobre dados reais
 
 Não publique `data/cnpjs.db` em repositório público. Ele pode conter CNPJs, dados de clientes e credenciais.

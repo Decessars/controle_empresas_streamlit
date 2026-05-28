@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import shutil
 import sqlite3
@@ -18,6 +19,7 @@ APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
 DEFAULT_DB_PATH = DATA_DIR / "cnpjs.db"
 DB_PATH = Path(os.getenv("CONTROLE_EMPRESAS_DB", str(DEFAULT_DB_PATH))).expanduser()
+AUTH_EXPORT_PATH = APP_DIR / "usuarios_senhas.txt"
 _ENGINE = None
 
 DEMAND_TYPES = [
@@ -1005,6 +1007,28 @@ def render_setup() -> None:
         st.rerun()
 
 
+def sync_auth_passwords_txt(users: dict[str, str]) -> None:
+    lines = [
+        "# Arquivo gerado automaticamente pelo app.",
+        "# Nao versionar nem compartilhar.",
+        "[auth.users]",
+    ]
+    for user in sorted(users):
+        lines.append(f"{user} = {json.dumps(users[user], ensure_ascii=False)}")
+    if not users:
+        lines.append("# Nenhum usuario configurado.")
+
+    content = "\n".join(lines) + "\n"
+    try:
+        if AUTH_EXPORT_PATH.exists():
+            current = AUTH_EXPORT_PATH.read_text(encoding="utf-8")
+            if current == content:
+                return
+        AUTH_EXPORT_PATH.write_text(content, encoding="utf-8")
+    except Exception:
+        pass
+
+
 def configured_users() -> dict[str, str]:
     users: dict[str, str] = {}
     try:
@@ -1018,6 +1042,7 @@ def configured_users() -> dict[str, str]:
     env_password = os.getenv("CONTROLE_EMPRESAS_PASSWORD")
     if env_user and env_password:
         users[str(env_user)] = str(env_password)
+    sync_auth_passwords_txt(users)
     return users
 
 
