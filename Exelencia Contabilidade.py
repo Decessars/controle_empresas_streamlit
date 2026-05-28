@@ -6,8 +6,9 @@ import json
 import os
 import shutil
 import sqlite3
+import uuid
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 import tomllib
 
@@ -688,6 +689,55 @@ def set_setting(key: str, value: str) -> None:
     )
 
 
+def active_session_cutoff(minutes: int = 10) -> str:
+    return (datetime.now() - timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def cleanup_active_sessions(minutes: int = 10) -> None:
+    execute("DELETE FROM active_sessions WHERE last_seen < ?", (active_session_cutoff(minutes),))
+
+
+def touch_active_session(page: str = "") -> None:
+    if not st.session_state.get("authenticated"):
+        return
+    session_id = str(st.session_state.get("session_id") or "").strip()
+    if not session_id:
+        session_id = uuid.uuid4().hex
+        st.session_state["session_id"] = session_id
+    usuario = str(st.session_state.get("auth_user", "")).strip() or "sistema"
+    timestamp = now_str()
+    execute(
+        """
+        INSERT INTO active_sessions (session_id, usuario, page, last_seen, criado_em)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+            usuario=excluded.usuario,
+            page=excluded.page,
+            last_seen=excluded.last_seen
+        """,
+        (session_id, usuario, str(page or st.session_state.get("page", "")), timestamp, timestamp),
+    )
+    cleanup_active_sessions()
+
+
+def remove_active_session() -> None:
+    session_id = str(st.session_state.get("session_id") or "").strip()
+    if session_id:
+        execute("DELETE FROM active_sessions WHERE session_id=?", (session_id,))
+    st.session_state.pop("session_id", None)
+
+
+def load_active_sessions() -> pd.DataFrame:
+    cleanup_active_sessions()
+    return query_df(
+        """
+        SELECT session_id, usuario, COALESCE(page,'') AS page, last_seen, criado_em
+          FROM active_sessions
+         ORDER BY last_seen DESC
+        """
+    )
+
+
 def parse_competencia(competencia: str) -> tuple[int, int]:
     try:
         year_str, month_str = competencia.split("-", 1)
@@ -858,6 +908,17 @@ def init_db() -> None:
         )
         execute(
             """
+            CREATE TABLE IF NOT EXISTS active_sessions (
+                session_id TEXT PRIMARY KEY,
+                usuario TEXT NOT NULL,
+                page TEXT,
+                last_seen TEXT,
+                criado_em TEXT
+            )
+            """
+        )
+        execute(
+            """
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -926,6 +987,17 @@ def init_db() -> None:
                 snapshot_atual TEXT,
                 criado_em TEXT,
                 FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+            )
+            """
+            )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS active_sessions (
+                session_id TEXT PRIMARY KEY,
+                usuario TEXT NOT NULL,
+                page TEXT,
+                last_seen TEXT,
+                criado_em TEXT
             )
             """
             )
@@ -1340,6 +1412,12 @@ def render_sidebar() -> tuple[str, str]:
     competencia = f"{int(year)}-{month}"
     st.session_state["competencia"] = competencia
     set_setting("ultima_competencia", competencia)
+    touch_active_session(page)
+    active_now = load_active_sessions()
+    st.sidebar.caption(f"Usu?rios online: {active_now["usuario"].nunique()} | Sess?es: {len(active_now)}")
+    if not active_now.empty:
+        names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
+        st.sidebar.caption(names)
     return page, competencia
 
 
