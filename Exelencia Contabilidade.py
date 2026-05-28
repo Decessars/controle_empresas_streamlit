@@ -1534,6 +1534,10 @@ def render_painel(competencia: str) -> None:
 def render_empresas() -> None:
     st.markdown("**Empresas**")
 
+    if msg := st.session_state.pop("empresa_save_notice", None):
+        st.success(msg)
+        st.toast(msg)
+
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
     if "empresas_view_mode" not in st.session_state:
@@ -1622,7 +1626,7 @@ def render_empresas() -> None:
                 if any(str(payload[key]) != str(orig_row[key]) for key in payload):
                     save_empresa(payload, empresa_id)
                     changed += 1
-            st.success(f"Altera??es salvas. Registros atualizados: {changed}.")
+            st.session_state["empresa_save_notice"] = f"Altera??es salvas. Registros atualizados: {changed}."
             st.rerun()
         except Exception as exc:
             st.error(f"N?o foi poss?vel salvar as altera??es. Detalhe: {exc}")
