@@ -1369,14 +1369,23 @@ def render_empresas() -> None:
 
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
+    if "empresas_view_mode" not in st.session_state:
+        st.session_state["empresas_view_mode"] = "ativas"
 
     with st.container(border=True):
         f1, f2 = st.columns([2.3, 1.3])
         search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
         regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
-        st.caption("Use o filtro de busca e o filtro de regime para navegar r?pido.")
+        b1, b2 = st.columns(2)
+        if b1.button("? Exibir Ativas"):
+            st.session_state["empresas_view_mode"] = "ativas"
+            st.rerun()
+        if b2.button("?? Exibir Exclu?das"):
+            st.session_state["empresas_view_mode"] = "excluidas"
+            st.rerun()
+        st.caption("Use o filtro de busca, o filtro de regime e os bot?es acima para alternar a tabela abaixo.")
 
-    empresas = load_empresas(active_only=True)
+    empresas = load_empresas(active_only=False)
 
     st.session_state["empresa_search"] = search
     filtered = empresas.copy()
@@ -1391,6 +1400,11 @@ def render_empresas() -> None:
         filtered = filtered[mask]
     if regime_filter != "Todos":
         filtered = filtered[filtered["regime"] == regime_filter]
+
+    if st.session_state["empresas_view_mode"] == "excluidas":
+        filtered = filtered[filtered["is_ativo"] == 0]
+    else:
+        filtered = filtered[filtered["is_ativo"] == 1]
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Total", len(filtered))
