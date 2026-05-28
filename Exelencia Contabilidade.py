@@ -1367,8 +1367,6 @@ def render_painel(competencia: str) -> None:
 def render_empresas() -> None:
     st.subheader("Empresas")
 
-    if "empresas_view_mode" not in st.session_state:
-        st.session_state["empresas_view_mode"] = "ativas"
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
 
@@ -1376,16 +1374,9 @@ def render_empresas() -> None:
         f1, f2 = st.columns([2.3, 1.3])
         search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
         regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
-        b1, b2 = st.columns(2)
-        if b1.button("✅ Ativas"):
-            st.session_state["empresas_view_mode"] = "ativas"
-            st.rerun()
-        if b2.button("📦 Excluídas"):
-            st.session_state["empresas_view_mode"] = "excluidas"
-            st.rerun()
-        st.caption("Use o filtro de busca e os filtros laterais para navegar rápido.")
+        st.caption("Use o filtro de busca e o filtro de regime para navegar r?pido.")
 
-    empresas = load_empresas(active_only=st.session_state["empresas_view_mode"] == "ativas")
+    empresas = load_empresas(active_only=True)
 
     st.session_state["empresa_search"] = search
     filtered = empresas.copy()
@@ -1400,17 +1391,13 @@ def render_empresas() -> None:
         filtered = filtered[mask]
     if regime_filter != "Todos":
         filtered = filtered[filtered["regime"] == regime_filter]
-    if st.session_state["empresas_view_mode"] == "excluidas":
-        filtered = filtered[filtered["is_ativo"] == 0]
-    elif st.session_state["empresas_view_mode"] == "ativas":
-        filtered = filtered[filtered["is_ativo"] == 1]
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Total", len(filtered))
     m2.metric("Ativas", int((filtered["is_ativo"] == 1).sum()) if not filtered.empty else 0)
-    m3.metric("Inativas", int((filtered["is_ativo"] == 0).sum()) if not filtered.empty else 0)
+    m3.metric("Regimes", int(filtered["regime"].nunique()) if not filtered.empty else 0)
 
-    show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo"]
+    show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]
     display_df = filtered[show_cols].copy() if not filtered.empty else filtered
     edited_df = show_table(
         display_df,
@@ -1428,7 +1415,6 @@ def render_empresas() -> None:
             "mensalidade": st.column_config.TextColumn("mensalidade", width=100),
             "cidade": st.column_config.TextColumn("cidade", width=100),
             "uf": st.column_config.TextColumn("uf", width=50),
-            "inativo": st.column_config.CheckboxColumn("inativo", width=75),
         },
     )
 
@@ -1436,8 +1422,8 @@ def render_empresas() -> None:
         st.info("Nenhuma empresa encontrada.")
         return
 
-    st.caption("Dica: dê duplo clique em uma célula para editar. Depois clique em 💾 Salvar alterações.")
-    if st.button("💾 Salvar alterações"):
+    st.caption("Dica: d? duplo clique em uma c?lula para editar. Depois clique em ?? Salvar altera??es.")
+    if st.button("?? Salvar altera??es"):
         try:
             changed = 0
             original = display_df.set_index("id")
@@ -1455,17 +1441,14 @@ def render_empresas() -> None:
                     "mensalidade": str(edited_row.get("mensalidade", "")),
                     "cidade": str(edited_row.get("cidade", "")),
                     "uf": str(edited_row.get("uf", "")),
-                    "inativo": int(bool(edited_row.get("inativo", False))),
                 }
                 if any(str(payload[key]) != str(orig_row[key]) for key in payload):
                     save_empresa(payload, empresa_id)
                     changed += 1
-            st.success(f"Alterações salvas. Registros atualizados: {changed}.")
+            st.success(f"Altera??es salvas. Registros atualizados: {changed}.")
             st.rerun()
         except Exception as exc:
-            st.error(f"Não foi possível salvar as alterações. Detalhe: {exc}")
-
-
+            st.error(f"N?o foi poss?vel salvar as altera??es. Detalhe: {exc}")
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
