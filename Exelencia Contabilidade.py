@@ -1361,7 +1361,7 @@ def render_empresas() -> None:
     st.subheader("Empresas")
 
     if "empresas_view_mode" not in st.session_state:
-        st.session_state["empresas_view_mode"] = "full"
+        st.session_state["empresas_view_mode"] = "ativas"
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
 
@@ -1369,28 +1369,20 @@ def render_empresas() -> None:
         f1, f2 = st.columns([2.3, 1.3])
         search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
         regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
-        b1, b2, b3, b4 = st.columns(4)
-        if b1.button("🔄 Visualizar Full"):
-            st.session_state["empresas_view_mode"] = "full"
-            st.rerun()
-        if b2.button("➕ Novo"):
+        b1, b2, b3 = st.columns(3)
+        if b1.button("➕ Novo"):
             st.session_state["page"] = "Novo Cliente"
             st.query_params["page"] = "Novo Cliente"
             st.rerun()
-        if b3.button("✅ Ativas"):
+        if b2.button("✅ Ativas"):
             st.session_state["empresas_view_mode"] = "ativas"
             st.rerun()
-        if b4.button("📦 Excluídas"):
+        if b3.button("📦 Excluídas"):
             st.session_state["empresas_view_mode"] = "excluidas"
             st.rerun()
-        st.caption("Use o filtro de busca e os botões para navegar rápido.")
+        st.caption("Use o filtro de busca e os filtros laterais para navegar rápido.")
 
-    if st.session_state["empresas_view_mode"] == "full":
-        empresas = load_empresas(active_only=False)
-    elif st.session_state["empresas_view_mode"] == "ativas":
-        empresas = load_empresas(active_only=True)
-    else:
-        empresas = load_empresas(active_only=False)
+    empresas = load_empresas(active_only=st.session_state["empresas_view_mode"] == "ativas")
 
     st.session_state["empresa_search"] = search
     filtered = empresas.copy()
@@ -1409,66 +1401,6 @@ def render_empresas() -> None:
         filtered = filtered[filtered["is_ativo"] == 0]
     elif st.session_state["empresas_view_mode"] == "ativas":
         filtered = filtered[filtered["is_ativo"] == 1]
-
-    if st.session_state["empresas_view_mode"] == "full":
-        st.markdown("#### Visualizar Full")
-        if st.button("↩️ Sair do Full"):
-            st.session_state["empresas_view_mode"] = "ativas"
-            st.rerun()
-        show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo"]
-        display_df = filtered[show_cols].copy() if not filtered.empty else filtered
-        edited_df = show_table(
-            display_df,
-            key="empresas_editor_full",
-            height=760,
-            editable=True,
-            disabled=["id"],
-            column_config={
-                "id": st.column_config.NumberColumn("id", width=60),
-                "cnpj": st.column_config.TextColumn("cnpj", width=130),
-                "razao_social": st.column_config.TextColumn("razao_social", width=240),
-                "nome_fantasia": st.column_config.TextColumn("nome_fantasia", width=140),
-                "apelido": st.column_config.TextColumn("apelido", width=120),
-                "regime": st.column_config.SelectboxColumn("Regime", options=REGIMES, width=120),
-                "mensalidade": st.column_config.TextColumn("mensalidade", width=100),
-                "cidade": st.column_config.TextColumn("cidade", width=100),
-                "uf": st.column_config.TextColumn("uf", width=50),
-                "inativo": st.column_config.CheckboxColumn("inativo", width=75),
-            },
-        )
-
-        if filtered.empty:
-            st.info("Nenhuma empresa encontrada.")
-            return
-
-        if st.button("💾 Salvar alterações do Full"):
-            try:
-                changed = 0
-                original = display_df.set_index("id")
-                for _, edited_row in edited_df.iterrows():
-                    empresa_id = int(edited_row["id"])
-                    if empresa_id not in original.index:
-                        continue
-                    orig_row = original.loc[empresa_id]
-                    payload = {
-                        "cnpj": str(edited_row.get("cnpj", "")),
-                        "razao_social": str(edited_row.get("razao_social", "")),
-                        "nome_fantasia": str(edited_row.get("nome_fantasia", "")),
-                        "apelido": str(edited_row.get("apelido", "")),
-                        "regime": str(edited_row.get("regime", "")),
-                        "mensalidade": str(edited_row.get("mensalidade", "")),
-                        "cidade": str(edited_row.get("cidade", "")),
-                        "uf": str(edited_row.get("uf", "")),
-                        "inativo": int(bool(edited_row.get("inativo", False))),
-                    }
-                    if any(str(payload[key]) != str(orig_row[key]) for key in payload):
-                        save_empresa(payload, empresa_id)
-                        changed += 1
-                st.success(f"Alterações salvas. Registros atualizados: {changed}.")
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Não foi possível salvar as alterações. Detalhe: {exc}")
-        return
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Total", len(filtered))
