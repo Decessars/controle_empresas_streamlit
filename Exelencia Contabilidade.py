@@ -1078,6 +1078,19 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
     return df.iloc[0].to_dict() if not df.empty else {}
 
 
+
+
+def load_empresa_history(empresa_id: int) -> pd.DataFrame:
+    return query_df(
+        """
+        SELECT id, empresa_id, acao, usuario, resumo, criado_em,
+               snapshot_anterior, snapshot_atual
+          FROM historico_empresas
+         WHERE empresa_id=?
+         ORDER BY id DESC
+        """,
+        (int(empresa_id),),
+    )
 def load_demandas(competencia: str) -> pd.DataFrame:
     df = query_df(
         """
@@ -1493,7 +1506,7 @@ def render_painel(competencia: str) -> None:
 
 
 def render_empresas() -> None:
-    st.subheader("Empresas")
+    st.markdown("**Empresas**")
 
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
@@ -1501,20 +1514,17 @@ def render_empresas() -> None:
         st.session_state["empresas_view_mode"] = "ativas"
 
     with st.container(border=True):
-        f1, f2 = st.columns([2.3, 1.3])
-        search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
-        regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
-        b1, b2 = st.columns(2)
-        if b1.button("? Exibir Ativas"):
+        c1, c2, c3, c4 = st.columns([2.1, 1.2, 0.8, 0.8])
+        search = c1.text_input("Buscar", value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder="Buscar")
+        regime_filter = c2.selectbox("Regime", ["Todos", *REGIMES], index=0, label_visibility="collapsed")
+        if c3.button("Ativas"):
             st.session_state["empresas_view_mode"] = "ativas"
             st.rerun()
-        if b2.button("?? Exibir Exclu?das"):
+        if c4.button("Exclu?das"):
             st.session_state["empresas_view_mode"] = "excluidas"
             st.rerun()
-        st.caption("Use o filtro de busca, o filtro de regime e os bot?es acima para alternar a tabela abaixo.")
 
     empresas = load_empresas(active_only=False)
-
     st.session_state["empresa_search"] = search
     filtered = empresas.copy()
     if search:
@@ -1528,24 +1538,17 @@ def render_empresas() -> None:
         filtered = filtered[mask]
     if regime_filter != "Todos":
         filtered = filtered[filtered["regime"] == regime_filter]
-
     if st.session_state["empresas_view_mode"] == "excluidas":
         filtered = filtered[filtered["is_ativo"] == 0]
     else:
         filtered = filtered[filtered["is_ativo"] == 1]
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Total", len(filtered))
-    m2.metric("Ativas", int((filtered["is_ativo"] == 1).sum()) if not filtered.empty else 0)
-    m3.metric("Regimes", int(filtered["regime"].nunique()) if not filtered.empty else 0)
-
-    show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]
-    display_df = filtered[show_cols].copy() if not filtered.empty else filtered
+    display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
     edited_df = show_table(
         display_df,
         key="empresas_editor",
-        height=460,
+        height=420,
         editable=editable_mode,
         disabled=["id"],
         column_config={
@@ -1565,8 +1568,7 @@ def render_empresas() -> None:
         st.info("Nenhuma empresa encontrada.")
         return
 
-    st.caption("Dica: d? duplo clique em uma c?lula para editar. Depois clique em ?? Salvar altera??es.")
-    if editable_mode and st.button("?? Salvar altera??es"):
+    if editable_mode and st.button("?? Salvar"):
         try:
             changed = 0
             original = display_df.set_index("id")
@@ -1593,44 +1595,7 @@ def render_empresas() -> None:
         except Exception as exc:
             st.error(f"N?o foi poss?vel salvar as altera??es. Detalhe: {exc}")
     elif not editable_mode:
-        st.info("A visão de excluídas é somente leitura. Use 'Exibir Ativas' para editar registros.")
-
-    st.divider()
-    with st.expander("Hist?rico de altera??es", expanded=False):
-        history_source = load_empresas(active_only=False)
-        if history_source.empty:
-            st.info("Sem empresas para consultar hist?rico.")
-        else:
-            selected_id = st.selectbox(
-                "Empresa",
-                history_source["id"].tolist(),
-                format_func=lambda eid: f"#{eid} - {history_source.loc[history_source['id'] == eid, 'razao_social'].iloc[0]}",
-                key="empresa_history_select",
-            )
-            history = load_empresa_history(int(selected_id))
-            if history.empty:
-                st.info("Nenhum hist?rico encontrado para esta empresa.")
-            else:
-                show_table(
-                    history[["acao", "usuario", "resumo", "criado_em"]],
-                    key=f"empresa_history_table_{selected_id}",
-                    height=260,
-                    editable=False,
-                    disabled=True,
-                    column_config={
-                        "acao": st.column_config.TextColumn("A??o", width=120),
-                        "usuario": st.column_config.TextColumn("Usu?rio", width=160),
-                        "resumo": st.column_config.TextColumn("Resumo", width=280),
-                        "criado_em": st.column_config.TextColumn("Data/Hora", width=160),
-                    },
-                )
-                with st.expander("Ver snapshots do registro", expanded=False):
-                    st.dataframe(
-                        history[["snapshot_anterior", "snapshot_atual"]],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-
+        st.caption("Exibindo somente empresas exclu?das.")
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
@@ -1684,7 +1649,7 @@ def render_novo_cliente() -> None:
 
 
 def render_demandas(competencia: str) -> None:
-    st.subheader("Demandas mensais")
+    st.markdown("**Demandas**")
     empresas = load_empresas(active_only=True)
     if empresas.empty:
         st.info("Cadastre empresas antes de criar demandas.")
@@ -1707,19 +1672,19 @@ def render_demandas(competencia: str) -> None:
 
     demandas = load_demandas(competencia)
     if demandas.empty:
-        st.info("Sem demandas nesta competência.")
+        st.info("Sem demandas nesta compet?ncia.")
         return
 
     f1, f2 = st.columns(2)
     tipo_filter = f1.selectbox("Filtrar tipo", ["Todos", *[label for _, label in DEMAND_TYPES]])
-    status_filter = f2.selectbox("Filtrar status", ["Todos", "Pendentes", "Concluídas"])
+    status_filter = f2.selectbox("Filtrar status", ["Todos", "Pendentes", "Conclu?das"])
     filtered = demandas.copy()
     if tipo_filter != "Todos":
         code = next(code for code, label in DEMAND_TYPES if label == tipo_filter)
         filtered = filtered[filtered["tipo"] == code]
     if status_filter == "Pendentes":
         filtered = filtered[filtered["feito"] == 0]
-    elif status_filter == "Concluídas":
+    elif status_filter == "Conclu?das":
         filtered = filtered[filtered["feito"] == 1]
 
     show_table(
@@ -1731,33 +1696,13 @@ def render_demandas(competencia: str) -> None:
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
             "demanda": st.column_config.TextColumn("Demanda", width=220),
-            "razao_social": st.column_config.TextColumn("Razão social", width=280),
+            "razao_social": st.column_config.TextColumn("Raz?o social", width=280),
             "cnpj": st.column_config.TextColumn("CNPJ", width=150),
             "status": st.column_config.TextColumn("Status", width=120),
-            "observacao": st.column_config.TextColumn("Observação", width=250),
+            "observacao": st.column_config.TextColumn("Observa??o", width=250),
             "atualizado_em": st.column_config.TextColumn("Atualizado em", width=160),
         },
     )
-
-    st.divider()
-    selected_id = st.selectbox("Atualizar demanda", filtered["id"].tolist(), format_func=lambda x: f"#{x}")
-    selected_row = filtered[filtered["id"] == selected_id].iloc[0].to_dict()
-    with st.form("demanda_update"):
-        st.write(f"{selected_row['demanda']} - {selected_row['razao_social']}")
-        feito = st.checkbox("Concluída", value=bool(selected_row["feito"]))
-        observacao = st.text_area("Observação", value=selected_row.get("observacao", ""))
-        c1, c2 = st.columns(2)
-        save = c1.form_submit_button("Salvar status")
-        remove = c2.form_submit_button("Remover demanda")
-    if save:
-        update_demanda_status(selected_id, feito, observacao)
-        st.success("Demanda atualizada.")
-        st.rerun()
-    if remove:
-        delete_demanda(selected_id)
-        st.success("Demanda removida.")
-        st.rerun()
-
 
 def render_automacao() -> None:
     st.subheader("Automação")
