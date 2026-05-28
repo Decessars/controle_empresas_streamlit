@@ -25,23 +25,23 @@ AUTH_EXPORT_PATH = APP_DIR / "usuarios_senhas.txt"
 _ENGINE = None
 
 DEMAND_TYPES = [
-    ("EXEC_FOLHA", "ExecuÃ§Ã£o da Folha de Pagamento"),
+    ("EXEC_FOLHA", "Execucao da Folha de Pagamento"),
     ("ENV_CONTRACHEQUES", "Envio de Contracheques"),
-    ("GUIA_INSS", "GeraÃ§Ã£o/Envio Guia INSS"),
-    ("GUIA_FGTS", "GeraÃ§Ã£o/Envio Guia FGTS"),
+    ("GUIA_INSS", "Geracao/Envio Guia INSS"),
+    ("GUIA_FGTS", "Geracao/Envio Guia FGTS"),
     ("GUIA_FGTS_PARC", "Parc FGTS"),
-    ("PEDIR_INFOS", "Pedir InformaÃ§Ãµes ao Cliente"),
-    ("APUR_ISS", "ApuraÃ§Ã£o ISS"),
-    ("APUR_SIMPLES", "ApuraÃ§Ã£o do Simples Nacional"),
+    ("PEDIR_INFOS", "Pedir Informacoes ao Cliente"),
+    ("APUR_ISS", "Apuracao ISS"),
+    ("APUR_SIMPLES", "Apuracao do Simples Nacional"),
     ("GUIA_MEI", "Gerar/Enviar DAS-MEI"),
     ("ENV_PARC_SIMPLES", "Enviar Parcelamento do Simples/MEI"),
-    ("REL_MEI", "RelatÃ³rio Mensal do MEI"),
+    ("REL_MEI", "Relatorio Mensal do MEI"),
     ("GUIA_PREF", "Guia da Prefeitura"),
-    ("REL_DEBITOS", "RelatÃ³rio de DÃ©bitos"),
+    ("REL_DEBITOS", "Relatorio de Debitos"),
     ("CONS_ICMS_ST", "Consulta ICMS-ST (SEFAZ)"),
-    ("PUXAR_NF_SAIDA", "Puxar NF de SaÃ­da (SEFAZ)"),
-    ("EMISSAO_NF", "EmissÃ£o NF"),
-    ("COBRAR_HONORARIOS", "Cobrar HonorÃ¡rios"),
+    ("PUXAR_NF_SAIDA", "Puxar NF de Saida (SEFAZ)"),
+    ("EMISSAO_NF", "Emissao NF"),
+    ("COBRAR_HONORARIOS", "Cobrar Honorarios"),
     ("PARC_MENSAL", "Parcelamento Mensal (impostos)"),
     ("PARC_IMPOSTOS", "Parcelamento de Impostos (outro)"),
     ("DEFIS", "DEFIS"),
@@ -56,47 +56,47 @@ MODULES = [
         "title": "Cadastro de Clientes",
         "desc": "Tela moderna para visualizar todos os clientes e editar cadastro com agilidade.",
         "tag": "CADASTRO",
-        "icon": "â—Ž",
+        "icon": "C",
         "enabled": True,
         "page": "Empresas",
     },
     {
         "title": "Demandas Mensais",
-        "desc": "Checklist operacional por competÃªncia com marcaÃ§Ã£o rÃ¡pida.",
+        "desc": "Checklist operacional por competencia com marcacao rapida.",
         "tag": "NOVO",
-        "icon": "â—ˆ",
+        "icon": "D",
         "enabled": True,
         "page": "Demandas",
     },
     {
-        "title": "AutomaÃ§Ã£o",
-        "desc": "Painel com aÃ§Ãµes fiscais rÃ¡pidas e atalhos para rotinas operacionais.",
+        "title": "Automacao",
+        "desc": "Painel com acoes fiscais rapidas e atalhos para rotinas operacionais.",
         "tag": "NOVO",
-        "icon": "â—Œ",
+        "icon": "A",
         "enabled": True,
-        "page": "AutomaÃ§Ã£o",
+        "page": "Automacao",
     },
     {
         "title": "Controle de Faturamento",
-        "desc": "LanÃ§amento manual mensal do faturamento MEI com alerta de limite anual.",
+        "desc": "Lancamento manual mensal do faturamento MEI com alerta de limite anual.",
         "tag": "MEI",
-        "icon": "â—",
+        "icon": "F",
         "enabled": False,
         "page": "Faturamento MEI",
     },
     {
-        "title": "RelatÃ³rios Inteligentes",
-        "desc": "Slot reservado para insights e exportaÃ§Ãµes avanÃ§adas.",
+        "title": "Relatorios Inteligentes",
+        "desc": "Slot reservado para insights e exportacoes avancadas.",
         "tag": "EM BREVE",
-        "icon": "â—Œ",
+        "icon": "R",
         "enabled": False,
-        "page": "RelatÃ³rios",
+        "page": "Relatorios",
     },
     {
         "title": "Painel de Controle 2026",
-        "desc": "Abrir o sistema principal de empresas, demandas e operaÃ§Ãµes.",
+        "desc": "Abrir o sistema principal de empresas, demandas e operacoes.",
         "tag": "PRINCIPAL",
-        "icon": "â—‰",
+        "icon": "P",
         "enabled": True,
         "featured": True,
         "page": "Painel",
@@ -654,7 +654,7 @@ def render_topbar() -> None:
         """
         <div class="nexus-topbar">
             <div class="nexus-brand">EXCELENCIA <span>CONTABILIDADE</span></div>
-            <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">ðŸ–¥ï¸ Local</a>
+            <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">Local</a>
         </div>
         """,
         unsafe_allow_html=True,
@@ -718,6 +718,10 @@ def touch_active_session(page: str = "") -> None:
         (session_id, usuario, str(page or st.session_state.get("page", "")), timestamp, timestamp),
     )
     cleanup_active_sessions()
+
+
+def current_user() -> str:
+    return str(st.session_state.get("auth_user", "")).strip() or "sistema"
 
 
 def remove_active_session() -> None:
@@ -1373,7 +1377,7 @@ def load_demandas(competencia: str) -> pd.DataFrame:
     )
     if not df.empty:
         df["demanda"] = df["tipo"].map(lambda code: DEMAND_LABELS.get(code, code))
-        df["status"] = df["feito"].map(lambda v: "ConcluÃ­da" if int(v or 0) else "Pendente")
+        df["status"] = df["feito"].map(lambda v: "Concluida" if int(v or 0) else "Pendente")
     return df
 
 
@@ -1404,12 +1408,12 @@ def delete_demanda(demanda_id: int) -> None:
 
 
 def render_setup() -> None:
-    st.warning("Banco de dados ainda nÃ£o encontrado para este projeto web.")
+    st.warning("Banco de dados ainda nao encontrado para este projeto web.")
     uploaded = st.file_uploader("Enviar cnpjs.db", type=["db", "sqlite", "sqlite3"])
     if uploaded:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         DEFAULT_DB_PATH.write_bytes(uploaded.getbuffer())
-        st.success("Banco recebido. Recarregue a pÃ¡gina para abrir o sistema.")
+        st.success("Banco recebido. Recarregue a pagina para abrir o sistema.")
     if st.button("Criar banco vazio"):
         init_db()
         st.rerun()
@@ -1485,14 +1489,14 @@ def require_login() -> bool:
 
     if st.session_state.get("authenticated"):
         if "page_label" not in st.session_state:
-            st.session_state["page_label"] = "ðŸ  MÃ³dulos"
+            st.session_state["page_label"] = "Modulos"
         if "page" not in st.session_state:
-            st.session_state["page"] = "MÃ³dulos"
+            st.session_state["page"] = "Modulos"
         with st.sidebar:
             user = st.session_state.get("auth_user", "")
             if user:
-                st.caption(f"ðŸ‘¤ {user}")
-            if st.button("ðŸšª Sair", help="Sair do sistema"):
+                st.caption(str(user))
+            if st.button("Sair", help="Sair do sistema"):
                 st.session_state.pop("authenticated", None)
                 st.session_state.pop("auth_user", None)
                 st.rerun()
@@ -1508,40 +1512,40 @@ def require_login() -> bool:
             unsafe_allow_html=True,
         )
         with st.form("login_form"):
-            user = st.text_input("UsuÃ¡rio")
+            user = st.text_input("Usuario")
             password = st.text_input("Senha", type="password")
             submitted = st.form_submit_button("Entrar")
     if submitted:
         if users.get(user) == password:
             st.session_state["authenticated"] = True
             st.session_state["auth_user"] = user
-            st.session_state["page_label"] = "ðŸ  MÃ³dulos"
-            st.session_state["page"] = "MÃ³dulos"
-            st.query_params["page"] = "MÃ³dulos"
+            st.session_state["page_label"] = "Modulos"
+            st.session_state["page"] = "Modulos"
+            st.query_params["page"] = "Modulos"
             st.rerun()
         else:
-            st.error("UsuÃ¡rio ou senha invÃ¡lidos.")
+            st.error("Usuario ou senha invalidos.")
     return False
 
 
 def render_sidebar() -> tuple[str, str]:
     menu_map = {
-        "ðŸ  MÃ³dulos": "MÃ³dulos",
-        "ðŸ“Š Painel": "Painel",
-        "âž• Novo Cliente": "Novo Cliente",
-        "ðŸ¢ Empresas": "Empresas",
-        "âœ… Demandas": "Demandas",
-        "âš™ï¸ AutomaÃ§Ã£o": "AutomaÃ§Ã£o",
-        "ðŸ’° Faturamento": "Faturamento MEI",
-        "ðŸ§° Backup": "Backup",
+        "Modulos": "Modulos",
+        "Painel": "Painel",
+        "Novo Cliente": "Novo Cliente",
+        "Empresas": "Empresas",
+        "Demandas": "Demandas",
+        "Automacao": "Automacao",
+        "Faturamento": "Faturamento MEI",
+        "Backup": "Backup",
     }
     menu_items = list(menu_map.keys())
-    requested_page = st.query_params.get("page", "MÃ³dulos")
-    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "ðŸ  MÃ³dulos")
+    requested_page = st.query_params.get("page", "Modulos")
+    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "Modulos")
     if requested_label not in menu_items:
-        requested_label = st.session_state.get("page_label", "ðŸ  MÃ³dulos")
+        requested_label = st.session_state.get("page_label", "Modulos")
     if requested_label not in menu_items:
-        requested_label = "ðŸ  MÃ³dulos"
+        requested_label = "Modulos"
     page_label = st.sidebar.radio("Menu", menu_items, index=menu_items.index(requested_label))
     page = menu_map[page_label]
     st.session_state["page_label"] = page_label
@@ -1554,13 +1558,13 @@ def render_sidebar() -> tuple[str, str]:
     month_options = [f"{m:02d}" for m in range(1, 13)]
     y1, y2 = st.sidebar.columns(2)
     year = y1.selectbox("Ano", years, index=years.index(current_year))
-    month = y2.selectbox("MÃªs", month_options, index=month_options.index(f"{current_month:02d}"))
+    month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"))
     competencia = f"{int(year)}-{month}"
     st.session_state["competencia"] = competencia
     set_setting("ultima_competencia", competencia)
     touch_active_session(page)
     active_now = load_active_sessions()
-    st.sidebar.caption(f"Usu?rios online: {active_now["usuario"].nunique()} | Sess?es: {len(active_now)}")
+    st.sidebar.caption(f"Usuarios online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
     if not active_now.empty:
         names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
         st.sidebar.caption(names)
@@ -1571,9 +1575,9 @@ def render_modulos() -> None:
     st.markdown(
         """
         <div class="launcher-shell">
-            <div class="launcher-kicker">â—  Portal Principal â€¢ SeleÃ§Ã£o de MÃ³dulo</div>
+            <div class="launcher-kicker">Portal Principal | Selecao de modulo</div>
             <div class="launcher-title">Acesso ao SISTEMA EXCELENCIA CONTABILIDADE</div>
-            <div class="launcher-subtitle">Selecione o ambiente de trabalho para iniciar sua operaÃ§Ã£o.</div>
+            <div class="launcher-subtitle">Selecione o ambiente de trabalho para iniciar sua operacao.</div>
         </div>
         <div class="launcher-grid-wrap">
         """,
@@ -1600,13 +1604,13 @@ def render_modulos() -> None:
                     unsafe_allow_html=True,
                 )
                 if enabled:
-                    if st.button("Acessar mÃ³dulo  >", key=f"access_module_{safe_key}"):
+                    if st.button("Acessar modulo >", key=f"access_module_{safe_key}"):
                         target = str(item["page"])
                         st.session_state["page"] = target
                         st.query_params["page"] = target
                         st.rerun()
                 else:
-                    st.button("DisponÃ­vel em breve", key=f"disabled_module_{safe_key}", disabled=True)
+                    st.button("Disponivel em breve", key=f"disabled_module_{safe_key}", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1641,14 +1645,14 @@ def render_painel(competencia: str) -> None:
     c1.metric("Empresas", total_empresas)
     c2.metric("Ativas", empresas_ativas)
     c3.metric("Inativas", empresas_inativas)
-    c4.metric("Demandas do mÃªs", total_demandas)
-    c5.metric("ConcluÃ­das", concluidas)
+    c4.metric("Demandas do mes", total_demandas)
+    c5.metric("Concluidas", concluidas)
     c6.metric("Pendentes", pendentes)
 
-    st.caption(f"CompetÃªncia selecionada: {competencia}")
+    st.caption(f"Competencia selecionada: {competencia}")
 
     if demandas.empty:
-        st.info("Sem demandas para esta competÃªncia. O painel continua mostrando os demais indicadores do banco.")
+        st.info("Sem demandas para esta competencia. O painel continua mostrando os demais indicadores do banco.")
 
     resumo = pd.DataFrame()
     if not demandas.empty:
@@ -1663,7 +1667,7 @@ def render_painel(competencia: str) -> None:
     with left:
         st.subheader("Resumo por demanda")
         if resumo.empty:
-            st.write("Sem dados para consolidar nesta competÃªncia.")
+            st.write("Sem dados para consolidar nesta competencia.")
         else:
             resumo_chart = resumo.pivot_table(index="demanda", columns="status", values="qtd", aggfunc="sum", fill_value=0)
             st.bar_chart(resumo_chart)
@@ -1686,7 +1690,7 @@ def render_painel(competencia: str) -> None:
         mc2.metric("NF", f"R$ {faturamento_nf:,.2f}")
         st.metric("Extrato", f"R$ {faturamento_extrato:,.2f}")
         if faturamento_mei.empty:
-            st.info("Sem faturamento MEI para esta competÃªncia.")
+            st.info("Sem faturamento MEI para esta competencia.")
         else:
             st.dataframe(
                 faturamento_mei[["razao_social", "valor", "valor_nota_fiscal", "valor_mov_extrato", "observacao"]],
@@ -1697,16 +1701,16 @@ def render_painel(competencia: str) -> None:
                     "valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
                     "valor_nota_fiscal": st.column_config.NumberColumn("NF", format="R$ %.2f"),
                     "valor_mov_extrato": st.column_config.NumberColumn("Extrato", format="R$ %.2f"),
-                    "observacao": st.column_config.TextColumn("ObservaÃ§Ã£o", width=180),
+                    "observacao": st.column_config.TextColumn("Observacao", width=180),
                 },
             )
 
     c_left, c_right = st.columns([1.05, 0.95])
     with c_left:
-        st.subheader("PendÃªncias")
+        st.subheader("Pendencias")
         pendentes_df = demandas[demandas["feito"] == 0][["demanda", "razao_social", "cnpj", "regime", "observacao"]] if not demandas.empty else demandas
         if pendentes_df.empty:
-            st.success("Nenhuma pendÃªncia aberta nesta competÃªncia.")
+            st.success("Nenhuma pendencia aberta nesta competencia.")
         else:
             show_table(
                 pendentes_df,
@@ -1716,15 +1720,15 @@ def render_painel(competencia: str) -> None:
                 disabled=True,
                 column_config={
                     "demanda": st.column_config.TextColumn("Demanda", width=220),
-                    "razao_social": st.column_config.TextColumn("RazÃ£o social", width=300),
+                    "razao_social": st.column_config.TextColumn("Razao social", width=300),
                     "cnpj": st.column_config.TextColumn("CNPJ", width=150),
                     "regime": st.column_config.TextColumn("Regime", width=120),
-                    "observacao": st.column_config.TextColumn("ObservaÃ§Ã£o", width=260),
+                    "observacao": st.column_config.TextColumn("Observacao", width=260),
                 },
             )
 
     with c_right:
-        st.subheader("Leitura rÃ¡pida")
+        st.subheader("Leitura rapida")
         regime_counts = empresas[empresas["is_ativo"] == 1]["regime"].replace("", "Sem regime").value_counts().reset_index()
         regime_counts.columns = ["regime", "qtd"]
         if regime_counts.empty:
@@ -1741,9 +1745,9 @@ def render_painel(competencia: str) -> None:
                 .sort_values(["pendencias", "razao_social"], ascending=[False, True])
                 .head(8)
             )
-            st.caption("Top clientes com pendÃªncias")
+            st.caption("Top clientes com pendencias")
             if top_pendentes.empty:
-                st.write("Sem pendÃªncias por cliente.")
+                st.write("Sem pendencias por cliente.")
             else:
                 show_table(
                     top_pendentes,
@@ -1754,12 +1758,12 @@ def render_painel(competencia: str) -> None:
                     column_config={
                         "razao_social": st.column_config.TextColumn("Cliente", width=260),
                         "cnpj": st.column_config.TextColumn("CNPJ", width=150),
-                        "pendencias": st.column_config.NumberColumn("PendÃªncias", width=100),
+                        "pendencias": st.column_config.NumberColumn("Pendencias", width=100),
                     },
                 )
 
     if not demandas.empty:
-        st.subheader("Ãšltimas movimentaÃ§Ãµes")
+        st.subheader("Ultimas movimentacoes")
         ultimas = demandas.sort_values(["atualizado_em", "id"], ascending=[False, False]).head(12)
         show_table(
             ultimas[["demanda", "razao_social", "status", "atualizado_em", "observacao"]],
@@ -1769,10 +1773,10 @@ def render_painel(competencia: str) -> None:
             disabled=True,
             column_config={
                 "demanda": st.column_config.TextColumn("Demanda", width=220),
-                "razao_social": st.column_config.TextColumn("RazÃ£o social", width=280),
+                "razao_social": st.column_config.TextColumn("Razao social", width=280),
                 "status": st.column_config.TextColumn("Status", width=110),
                 "atualizado_em": st.column_config.TextColumn("Atualizado em", width=160),
-                "observacao": st.column_config.TextColumn("ObservaÃ§Ã£o", width=240),
+                "observacao": st.column_config.TextColumn("Observacao", width=240),
             },
         )
 
@@ -1912,7 +1916,7 @@ def render_novo_cliente() -> None:
         with st.form("novo_cliente_form"):
             c1, c2 = st.columns(2)
             cnpj = c1.text_input("CNPJ")
-            razao = c2.text_input("RazÃ£o social")
+            razao = c2.text_input("Razao social")
             fantasia = c1.text_input("Nome fantasia")
             apelido = c2.text_input("Apelido")
             regime = c1.selectbox("Regime", REGIMES, index=0)
@@ -1921,8 +1925,8 @@ def render_novo_cliente() -> None:
             uf = c2.text_input("UF", max_chars=2)
             inativo = st.checkbox("Inativa", value=False)
             csave, ccancel = st.columns(2)
-            save_new = csave.form_submit_button("ðŸ’¾ Salvar novo")
-            cancel_new = ccancel.form_submit_button("â†©ï¸ Voltar")
+            save_new = csave.form_submit_button("Salvar novo")
+            cancel_new = ccancel.form_submit_button("Voltar")
 
         if cancel_new:
             st.session_state["page"] = "Empresas"
@@ -1931,7 +1935,7 @@ def render_novo_cliente() -> None:
 
         if save_new:
             if not cnpj or not razao:
-                st.error("CNPJ e razÃ£o social sÃ£o obrigatÃ³rios.")
+                st.error("CNPJ e razao social sao obrigatorios.")
             else:
                 try:
                     save_empresa(
@@ -1953,7 +1957,7 @@ def render_novo_cliente() -> None:
                     st.query_params["page"] = "Empresas"
                     st.rerun()
                 except Exception as exc:
-                    st.error(f"NÃ£o foi possÃ­vel salvar o novo cliente. Detalhe: {exc}")
+                    st.error(f"Nao foi possivel salvar o novo cliente. Detalhe: {exc}")
 
 
 def render_demandas(competencia: str) -> None:
@@ -2013,17 +2017,17 @@ def render_demandas(competencia: str) -> None:
     )
 
 def render_automacao() -> None:
-    st.subheader("AutomaÃ§Ã£o")
-    st.caption("Painel com aÃ§Ãµes fiscais rÃ¡pidas e atalhos para rotinas operacionais.")
+    st.subheader("Automacao")
+    st.caption("Painel com acoes fiscais rapidas e atalhos para rotinas operacionais.")
 
     actions = [
-        ("Baixar Guias do MEI", "Use a ExtensÃ£o: Baixar Guias_DMLS!"),
-        ("Baixar NFe (Portal do Contribuinte)", "Rotina depende das credenciais e do fluxo do Portal do Contribuinte. A versÃ£o web serÃ¡ ligada ao mesmo cadastro de acessos."),
-        ("Extrair XML", "Use a ExtensÃ£o: Extrator XML (dmls)."),
-        ("Analisar XML", "Selecione os XMLs na versÃ£o web para gerar uma anÃ¡lise simplificada."),
-        ("Emitir CertidÃ£o Negativa", "FunÃ§Ã£o em preparaÃ§Ã£o para integraÃ§Ã£o web."),
-        ("Importar PendÃªncias", "FunÃ§Ã£o em preparaÃ§Ã£o para integraÃ§Ã£o web."),
-        ("RelatÃ³rio Fiscal", "FunÃ§Ã£o em preparaÃ§Ã£o para integraÃ§Ã£o web."),
+        ("Baixar Guias do MEI", "Use a extensao: Baixar Guias_DMLS!"),
+        ("Baixar NFe (Portal do Contribuinte)", "Rotina depende das credenciais e do fluxo do Portal do Contribuinte. A versao web sera ligada ao mesmo cadastro de acessos."),
+        ("Extrair XML", "Use a extensao: Extrator XML (dmls)."),
+        ("Analisar XML", "Selecione os XMLs na versao web para gerar uma analise simplificada."),
+        ("Emitir Certidao Negativa", "Funcao em preparacao para integracao web."),
+        ("Importar Pendencias", "Funcao em preparacao para integracao web."),
+        ("Relatorio Fiscal", "Funcao em preparacao para integracao web."),
     ]
 
     for start in range(0, len(actions), 2):
@@ -2054,7 +2058,7 @@ def render_automacao() -> None:
                     "tamanho_bytes": st.column_config.NumberColumn("Tamanho (bytes)", width=140),
                 },
             )
-            st.warning("Leitura fiscal detalhada serÃ¡ conectada na prÃ³xima etapa para espelhar o relatÃ³rio do desktop.")
+            st.warning("Leitura fiscal detalhada sera conectada na proxima etapa para espelhar o relatorio do desktop.")
 
 
 def render_faturamento(competencia: str) -> None:
@@ -2087,12 +2091,12 @@ def render_faturamento(competencia: str) -> None:
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
             "empresa_id": st.column_config.NumberColumn("empresa_id", width=90),
-            "razao_social": st.column_config.TextColumn("RazÃ£o social", width=260),
-            "competencia": st.column_config.TextColumn("CompetÃªncia", width=110),
+            "razao_social": st.column_config.TextColumn("Razao social", width=260),
+            "competencia": st.column_config.TextColumn("Competencia", width=110),
             "valor": st.column_config.TextColumn("Valor", width=90),
             "valor_nota_fiscal": st.column_config.TextColumn("NF", width=90),
             "valor_mov_extrato": st.column_config.TextColumn("Extrato", width=90),
-            "observacao": st.column_config.TextColumn("ObservaÃ§Ã£o", width=220),
+            "observacao": st.column_config.TextColumn("Observacao", width=220),
         },
     )
 
@@ -2106,7 +2110,7 @@ def render_faturamento(competencia: str) -> None:
         valor = c1.number_input("Valor bruto", min_value=0.0, step=100.0, format="%.2f")
         valor_nf = c2.number_input("Notas fiscais", min_value=0.0, step=100.0, format="%.2f")
         valor_ext = c3.number_input("Movimento extrato", min_value=0.0, step=100.0, format="%.2f")
-        observacao = st.text_area("ObservaÃ§Ã£o")
+        observacao = st.text_area("Observacao")
         submitted = st.form_submit_button("Salvar faturamento")
     if submitted:
         timestamp = now_str()
@@ -2131,7 +2135,7 @@ def render_faturamento(competencia: str) -> None:
 
 def render_backup() -> None:
     st.subheader("Backup e dados")
-    st.write("Use esta tela para baixar uma cÃ³pia dos dados ou substituir a base SQLite local.")
+    st.write("Use esta tela para baixar uma copia dos dados ou substituir a base SQLite local.")
 
     if using_postgres():
         buffer = io.BytesIO()
@@ -2145,7 +2149,7 @@ def render_backup() -> None:
             file_name=f"controle_empresas_backup_{datetime.now():%Y%m%d_%H%M%S}.zip",
             mime="application/zip",
         )
-        st.info("Em modo PostgreSQL, a substituiÃ§Ã£o direta por arquivo .db fica desativada.")
+        st.info("Em modo PostgreSQL, a substituicao direta por arquivo .db fica desativada.")
         return
 
     if DB_PATH.exists():
@@ -2157,12 +2161,12 @@ def render_backup() -> None:
         )
 
     uploaded = st.file_uploader("Substituir banco por outro cnpjs.db", type=["db", "sqlite", "sqlite3"])
-    if uploaded and st.button("Confirmar substituiÃ§Ã£o"):
+    if uploaded and st.button("Confirmar substituicao"):
         backup_path = DB_PATH.with_suffix(f".bak_{datetime.now():%Y%m%d_%H%M%S}.db")
         if DB_PATH.exists():
             shutil.copy2(DB_PATH, backup_path)
         DB_PATH.write_bytes(uploaded.getbuffer())
-        st.success("Banco substituÃ­do. Recarregue a pÃ¡gina.")
+        st.success("Banco substituido. Recarregue a pagina.")
 
 
 def main() -> None:
@@ -2182,7 +2186,7 @@ def main() -> None:
 
     page, competencia = render_sidebar()
 
-    if page == "MÃ³dulos":
+    if page == "Modulos":
         render_modulos()
     elif page == "Painel":
         render_painel(competencia)
@@ -2192,7 +2196,7 @@ def main() -> None:
         render_empresas()
     elif page == "Demandas":
         render_demandas(competencia)
-    elif page == "AutomaÃ§Ã£o":
+    elif page == "Automacao":
         render_automacao()
     elif page == "Faturamento MEI":
         render_faturamento(competencia)
