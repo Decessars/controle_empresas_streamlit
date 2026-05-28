@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 .streamlit/secrets.toml
-usuarios_senhas.txt
 data/*.db
 data/*.sqlite
 data/*.sqlite3

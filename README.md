@@ -81,9 +81,9 @@ funcionario = "outra-senha"
 url = "postgresql+psycopg://usuario:senha@host:5432/banco"
 ```
 
-Se nenhum usuario for configurado, o app bloqueia o acesso e mostra apenas a orientacao de configuracao. Isso evita expor exemplos de senha na interface publica.
+Se nenhum usuario for configurado via `st.secrets` ou variaveis de ambiente, o app usa o arquivo versionado `usuarios_senhas.txt` como fallback para permitir o login na nuvem.
 
-O app também gera localmente um arquivo `usuarios_senhas.txt` com o espelho das credenciais carregadas. Esse TXT é ignorado no Git e serve apenas como referência local.
+O app também mantém o arquivo `usuarios_senhas.txt` sincronizado com as credenciais carregadas.
 
 ## Atenção sobre dados reais
 

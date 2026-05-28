@@ -9,6 +9,7 @@ import sqlite3
 import zipfile
 from datetime import date, datetime
 from pathlib import Path
+import tomllib
 
 import pandas as pd
 import streamlit as st
@@ -1029,8 +1030,19 @@ def sync_auth_passwords_txt(users: dict[str, str]) -> None:
         pass
 
 
+def load_auth_users_from_file() -> dict[str, str]:
+    if not AUTH_EXPORT_PATH.exists():
+        return {}
+    try:
+        data = tomllib.loads(AUTH_EXPORT_PATH.read_text(encoding="utf-8"))
+        raw_users = data.get("auth", {}).get("users", {})
+        return {str(k): str(v) for k, v in dict(raw_users).items()}
+    except Exception:
+        return {}
+
+
 def configured_users() -> dict[str, str]:
-    users: dict[str, str] = {}
+    users: dict[str, str] = load_auth_users_from_file()
     try:
         secrets_auth = st.secrets.get("auth", {})
         raw_users = secrets_auth.get("users", {}) if hasattr(secrets_auth, "get") else {}

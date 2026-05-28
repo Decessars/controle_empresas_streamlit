@@ -1,0 +1,7 @@
+# Arquivo gerado automaticamente pelo app.
+# Nao versionar nem compartilhar.
+[auth.users]
+DMLIMA = "123456"
+EDIVAN = "123456"
+RAYANA = "123456"
+VITOR = "123456"
