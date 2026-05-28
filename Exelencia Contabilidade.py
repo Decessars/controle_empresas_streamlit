@@ -1369,15 +1369,11 @@ def render_empresas() -> None:
         f1, f2 = st.columns([2.3, 1.3])
         search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
         regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
-        b1, b2, b3 = st.columns(3)
-        if b1.button("➕ Novo"):
-            st.session_state["page"] = "Novo Cliente"
-            st.query_params["page"] = "Novo Cliente"
-            st.rerun()
-        if b2.button("✅ Ativas"):
+        b1, b2 = st.columns(2)
+        if b1.button("✅ Ativas"):
             st.session_state["empresas_view_mode"] = "ativas"
             st.rerun()
-        if b3.button("📦 Excluídas"):
+        if b2.button("📦 Excluídas"):
             st.session_state["empresas_view_mode"] = "excluidas"
             st.rerun()
         st.caption("Use o filtro de busca e os filtros laterais para navegar rápido.")
