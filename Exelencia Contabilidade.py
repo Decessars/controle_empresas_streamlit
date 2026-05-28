@@ -1217,6 +1217,42 @@ def empresa_snapshot(row: dict | None) -> dict:
     }
 
 
+def record_empresa_history(empresa_id: int, action: str, before: dict, after: dict) -> None:
+    labels = {
+        "cnpj": "CNPJ",
+        "razao_social": "Razão social",
+        "nome_fantasia": "Nome fantasia",
+        "apelido": "Apelido",
+        "regime": "Regime",
+        "mensalidade": "Mensalidade",
+        "cidade": "Cidade",
+        "uf": "UF",
+        "inativo": "Inativo",
+        "is_ativo": "Ativo",
+    }
+    changed_fields = []
+    for key, label in labels.items():
+        if str(before.get(key, "")) != str(after.get(key, "")):
+            changed_fields.append(label)
+    summary = ", ".join(changed_fields) if changed_fields else action
+    execute(
+        """
+        INSERT INTO historico_empresas
+            (empresa_id, acao, usuario, resumo, snapshot_anterior, snapshot_atual, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(empresa_id),
+            action,
+            current_user(),
+            summary,
+            json.dumps(before, ensure_ascii=False),
+            json.dumps(after, ensure_ascii=False),
+            now_str(),
+        ),
+    )
+
+
 def empresas_export_csv(df: pd.DataFrame) -> bytes:
     export_cols = [
         "id",
