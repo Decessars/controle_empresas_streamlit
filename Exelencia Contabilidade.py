@@ -361,11 +361,12 @@ def apply_nexus_theme() -> None:
         .st-key-login_card {
             width: min(460px, calc(100vw - 48px));
             margin: 7vh auto 0 auto;
-            background: rgba(255,255,255,.92);
-            border: 1px solid rgba(124,58,237,.18);
+            background: #ffffff;
+            border: 2px solid rgba(91,33,182,.32);
+            outline: 1px solid rgba(91,33,182,.08);
             border-radius: 14px;
-            padding: 28px 28px 24px;
-            box-shadow: 0 24px 70px rgba(15,23,42,.12);
+            padding: 24px 24px 20px;
+            box-shadow: 0 18px 44px rgba(15,23,42,.10);
         }
         .st-key-login_card div[data-testid="stForm"] {
             border: 0;
@@ -373,6 +374,9 @@ def apply_nexus_theme() -> None:
         }
         .st-key-login_card input {
             min-height: 42px;
+        }
+        .st-key-login_card div[data-testid="stTextInputRootElement"] {
+            margin-bottom: 0.45rem;
         }
         .st-key-login_card .stButton > button,
         .st-key-login_card div[data-testid="stFormSubmitButton"] button {
@@ -1090,6 +1094,8 @@ def load_empresa_history(empresa_id: int) -> pd.DataFrame:
         """,
         (int(empresa_id),),
     )
+
+
 def load_demandas(competencia: str) -> pd.DataFrame:
     df = query_df(
         """
