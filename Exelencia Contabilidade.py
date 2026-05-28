@@ -1193,54 +1193,168 @@ def render_modulos() -> None:
 def render_painel(competencia: str) -> None:
     empresas = load_empresas(active_only=False)
     demandas = load_demandas(competencia)
+    faturamento_mei = query_df(
+        """
+        SELECT f.id, f.empresa_id, e.razao_social, f.competencia, f.valor,
+               COALESCE(f.valor_nota_fiscal,0) AS valor_nota_fiscal,
+               COALESCE(f.valor_mov_extrato,0) AS valor_mov_extrato,
+               COALESCE(f.observacao,'') AS observacao
+          FROM faturamento_mei f
+          JOIN empresas e ON e.id=f.empresa_id
+         WHERE f.competencia=?
+         ORDER BY e.razao_social COLLATE NOCASE
+        """,
+        (competencia,),
+    )
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Empresas", len(empresas))
-    c2.metric("Ativas", int((empresas["is_ativo"] == 1).sum()) if not empresas.empty else 0)
-    c3.metric("Demandas do mês", len(demandas))
+    total_empresas = len(empresas)
+    empresas_ativas = int((empresas["is_ativo"] == 1).sum()) if not empresas.empty else 0
+    empresas_inativas = int((empresas["is_ativo"] == 0).sum()) if not empresas.empty else 0
+    total_demandas = len(demandas)
     concluidas = int((demandas["feito"] == 1).sum()) if not demandas.empty else 0
-    c4.metric("Concluídas", concluidas)
+    pendentes = int((demandas["feito"] == 0).sum()) if not demandas.empty else 0
+    receita_mei = float(faturamento_mei["valor"].fillna(0).sum()) if not faturamento_mei.empty else 0.0
+    faturamento_nf = float(faturamento_mei["valor_nota_fiscal"].fillna(0).sum()) if not faturamento_mei.empty else 0.0
+    faturamento_extrato = float(faturamento_mei["valor_mov_extrato"].fillna(0).sum()) if not faturamento_mei.empty else 0.0
+
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Empresas", total_empresas)
+    c2.metric("Ativas", empresas_ativas)
+    c3.metric("Inativas", empresas_inativas)
+    c4.metric("Demandas do mês", total_demandas)
+    c5.metric("Concluídas", concluidas)
+    c6.metric("Pendentes", pendentes)
+
+    st.caption(f"Competência selecionada: {competencia}")
 
     if demandas.empty:
-        st.info("Sem demandas para esta competência.")
-        return
+        st.info("Sem demandas para esta competência. O painel continua mostrando os demais indicadores do banco.")
 
-    resumo = (
-        demandas.groupby(["tipo", "demanda", "status"])
-        .size()
-        .reset_index(name="qtd")
-        .sort_values(["tipo", "status"])
-    )
-    st.subheader("Resumo por demanda")
-    show_table(
-        resumo[["demanda", "status", "qtd"]],
-        key=f"painel_resumo_{competencia}",
-        height=260,
-        editable=False,
-        disabled=True,
-        column_config={
-            "demanda": st.column_config.TextColumn("Demanda", width=260),
-            "status": st.column_config.TextColumn("Status", width=120),
-            "qtd": st.column_config.NumberColumn("Qtd", width=80),
-        },
-    )
+    resumo = pd.DataFrame()
+    if not demandas.empty:
+        resumo = (
+            demandas.groupby(["tipo", "demanda", "status"])
+            .size()
+            .reset_index(name="qtd")
+            .sort_values(["tipo", "status"])
+        )
 
-    st.subheader("Pendências")
-    pendentes = demandas[demandas["feito"] == 0][["demanda", "razao_social", "cnpj", "regime", "observacao"]]
-    show_table(
-        pendentes,
-        key=f"painel_pendentes_{competencia}",
-        height=320,
-        editable=False,
-        disabled=True,
-        column_config={
-            "demanda": st.column_config.TextColumn("Demanda", width=220),
-            "razao_social": st.column_config.TextColumn("Razão social", width=300),
-            "cnpj": st.column_config.TextColumn("CNPJ", width=150),
-            "regime": st.column_config.TextColumn("Regime", width=120),
-            "observacao": st.column_config.TextColumn("Observação", width=260),
-        },
-    )
+    left, right = st.columns([1.1, 0.9])
+    with left:
+        st.subheader("Resumo por demanda")
+        if resumo.empty:
+            st.write("Sem dados para consolidar nesta competência.")
+        else:
+            resumo_chart = resumo.pivot_table(index="demanda", columns="status", values="qtd", aggfunc="sum", fill_value=0)
+            st.bar_chart(resumo_chart)
+            show_table(
+                resumo[["demanda", "status", "qtd"]],
+                key=f"painel_resumo_{competencia}",
+                height=260,
+                editable=False,
+                disabled=True,
+                column_config={
+                    "demanda": st.column_config.TextColumn("Demanda", width=260),
+                    "status": st.column_config.TextColumn("Status", width=120),
+                    "qtd": st.column_config.NumberColumn("Qtd", width=80),
+                },
+            )
+    with right:
+        st.subheader("Faturamento MEI")
+        mc1, mc2 = st.columns(2)
+        mc1.metric("Total", f"R$ {receita_mei:,.2f}")
+        mc2.metric("NF", f"R$ {faturamento_nf:,.2f}")
+        st.metric("Extrato", f"R$ {faturamento_extrato:,.2f}")
+        if faturamento_mei.empty:
+            st.info("Sem faturamento MEI para esta competência.")
+        else:
+            st.dataframe(
+                faturamento_mei[["razao_social", "valor", "valor_nota_fiscal", "valor_mov_extrato", "observacao"]],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "razao_social": st.column_config.TextColumn("Empresa", width=220),
+                    "valor": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+                    "valor_nota_fiscal": st.column_config.NumberColumn("NF", format="R$ %.2f"),
+                    "valor_mov_extrato": st.column_config.NumberColumn("Extrato", format="R$ %.2f"),
+                    "observacao": st.column_config.TextColumn("Observação", width=180),
+                },
+            )
+
+    c_left, c_right = st.columns([1.05, 0.95])
+    with c_left:
+        st.subheader("Pendências")
+        pendentes_df = demandas[demandas["feito"] == 0][["demanda", "razao_social", "cnpj", "regime", "observacao"]] if not demandas.empty else demandas
+        if pendentes_df.empty:
+            st.success("Nenhuma pendência aberta nesta competência.")
+        else:
+            show_table(
+                pendentes_df,
+                key=f"painel_pendentes_{competencia}",
+                height=320,
+                editable=False,
+                disabled=True,
+                column_config={
+                    "demanda": st.column_config.TextColumn("Demanda", width=220),
+                    "razao_social": st.column_config.TextColumn("Razão social", width=300),
+                    "cnpj": st.column_config.TextColumn("CNPJ", width=150),
+                    "regime": st.column_config.TextColumn("Regime", width=120),
+                    "observacao": st.column_config.TextColumn("Observação", width=260),
+                },
+            )
+
+    with c_right:
+        st.subheader("Leitura rápida")
+        regime_counts = empresas[empresas["is_ativo"] == 1]["regime"].replace("", "Sem regime").value_counts().reset_index()
+        regime_counts.columns = ["regime", "qtd"]
+        if regime_counts.empty:
+            st.info("Sem empresas ativas para resumir por regime.")
+        else:
+            st.bar_chart(regime_counts.set_index("regime"))
+
+        if not demandas.empty:
+            top_pendentes = (
+                demandas[demandas["feito"] == 0]
+                .groupby(["razao_social", "cnpj"])
+                .size()
+                .reset_index(name="pendencias")
+                .sort_values(["pendencias", "razao_social"], ascending=[False, True])
+                .head(8)
+            )
+            st.caption("Top clientes com pendências")
+            if top_pendentes.empty:
+                st.write("Sem pendências por cliente.")
+            else:
+                show_table(
+                    top_pendentes,
+                    key=f"painel_top_pendencias_{competencia}",
+                    height=220,
+                    editable=False,
+                    disabled=True,
+                    column_config={
+                        "razao_social": st.column_config.TextColumn("Cliente", width=260),
+                        "cnpj": st.column_config.TextColumn("CNPJ", width=150),
+                        "pendencias": st.column_config.NumberColumn("Pendências", width=100),
+                    },
+                )
+
+    if not demandas.empty:
+        st.subheader("Últimas movimentações")
+        ultimas = demandas.sort_values(["atualizado_em", "id"], ascending=[False, False]).head(12)
+        show_table(
+            ultimas[["demanda", "razao_social", "status", "atualizado_em", "observacao"]],
+            key=f"painel_ultimas_{competencia}",
+            height=260,
+            editable=False,
+            disabled=True,
+            column_config={
+                "demanda": st.column_config.TextColumn("Demanda", width=220),
+                "razao_social": st.column_config.TextColumn("Razão social", width=280),
+                "status": st.column_config.TextColumn("Status", width=110),
+                "atualizado_em": st.column_config.TextColumn("Atualizado em", width=160),
+                "observacao": st.column_config.TextColumn("Observação", width=240),
+            },
+        )
 
 
 def render_empresas() -> None:
