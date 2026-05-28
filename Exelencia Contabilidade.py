@@ -1216,6 +1216,98 @@ def empresa_snapshot(row: dict | None) -> dict:
         "criado_em": str(data.get("criado_em", "") or ""),
     }
 
+
+def empresas_export_csv(df: pd.DataFrame) -> bytes:
+    export_cols = [
+        "id",
+        "cnpj",
+        "razao_social",
+        "nome_fantasia",
+        "apelido",
+        "regime",
+        "mensalidade",
+        "cidade",
+        "uf",
+        "inativo",
+        "is_ativo",
+    ]
+    export_df = df.copy()
+    for col in export_cols:
+        if col not in export_df.columns:
+            export_df[col] = ""
+    export_df = export_df[export_cols].fillna("")
+    return export_df.to_csv(index=False).encode("utf-8-sig")
+
+
+def empresas_import_dataframe(uploaded_file) -> pd.DataFrame:
+    name = str(getattr(uploaded_file, "name", "") or "").lower()
+    if name.endswith(".csv") or name.endswith(".txt"):
+        df = pd.read_csv(uploaded_file)
+    elif name.endswith(".xlsx") or name.endswith(".xls"):
+        df = pd.read_excel(uploaded_file)
+    else:
+        raise ValueError("Formato não suportado. Use CSV ou XLSX.")
+    df.columns = [str(col).strip().lower() for col in df.columns]
+    return df
+
+
+def empresas_apply_import(df: pd.DataFrame) -> tuple[int, int]:
+    updated = 0
+    created = 0
+    if df.empty:
+        return updated, created
+
+    for _, row in df.iterrows():
+        raw_id = row.get("id", "")
+        raw_cnpj = row.get("cnpj", "")
+        existing = {}
+        empresa_id = None
+
+        if pd.notna(raw_id) and str(raw_id).strip():
+            try:
+                empresa_id = int(float(str(raw_id).replace(",", ".")))
+                existing = empresa_row(empresa_id)
+            except Exception:
+                empresa_id = None
+
+        if not existing and pd.notna(raw_cnpj) and str(raw_cnpj).strip():
+            existing = empresa_row_by_cnpj(str(raw_cnpj))
+            if existing:
+                empresa_id = int(existing.get("id", 0) or 0)
+
+        if not existing and not empresa_id:
+            empresa_id = None
+
+        def pick(field: str, default: str = "") -> str:
+            value = row.get(field, "")
+            if pd.isna(value) or str(value).strip() == "":
+                return str(existing.get(field, default) if existing else default)
+            return str(value).strip()
+
+        payload = {
+            "cnpj": normalize_cnpj(pick("cnpj", existing.get("cnpj", "") if existing else "")),
+            "razao_social": pick("razao_social", existing.get("razao_social", "") if existing else "").strip(),
+            "nome_fantasia": pick("nome_fantasia", existing.get("nome_fantasia", "") if existing else "").strip(),
+            "apelido": pick("apelido", existing.get("apelido", "") if existing else "").strip(),
+            "regime": pick("regime", existing.get("regime", "") if existing else "").strip(),
+            "mensalidade": pick("mensalidade", existing.get("mensalidade", "") if existing else "").strip(),
+            "cidade": pick("cidade", existing.get("cidade", "") if existing else "").strip(),
+            "uf": pick("uf", existing.get("uf", "") if existing else "").strip().upper(),
+            "inativo": int(float(str(row.get("inativo", existing.get("inativo", 0) if existing else 0) or 0).replace(",", "."))),
+        }
+
+        if not payload["cnpj"] or not payload["razao_social"]:
+            continue
+
+        if empresa_id and existing:
+            save_empresa(payload, empresa_id)
+            updated += 1
+        else:
+            save_empresa(payload, None)
+            created += 1
+
+    return updated, created
+
 def load_empresa_history(empresa_id: int) -> pd.DataFrame:
     return query_df(
         """
@@ -1694,6 +1786,40 @@ def render_empresas() -> None:
     display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
 
+    with st.container(border=True):
+        e1, e2 = st.columns([1, 1])
+        export_df = display_df if not display_df.empty else filtered
+        e1.download_button(
+            "Exportar",
+            data=empresas_export_csv(export_df),
+            file_name=f"empresas_export_{datetime.now():%Y%m%d_%H%M%S}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+        uploaded_import = e2.file_uploader(
+            "Importar",
+            type=["csv", "xlsx", "xls"],
+            label_visibility="collapsed",
+            key="empresas_import_uploader",
+            help="Atualiza em massa por id ou cnpj.",
+        )
+
+    if uploaded_import is not None:
+        import_hash = hash(uploaded_import.getvalue())
+        if st.session_state.get("empresas_last_import_hash") != import_hash:
+            try:
+                imported_df = empresas_import_dataframe(uploaded_import)
+                updated, created = empresas_apply_import(imported_df)
+                st.session_state["empresas_last_import_hash"] = import_hash
+                st.session_state["empresa_save_notice"] = f"Importação concluída. Atualizados: {updated}. Criados: {created}."
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível importar o arquivo. Detalhe: {exc}")
+
+    if filtered.empty:
+        st.info("Nenhuma empresa encontrada.")
+        return
+
     edited_df = show_table(
         display_df,
         key="empresas_editor",
@@ -1712,10 +1838,6 @@ def render_empresas() -> None:
             "uf": st.column_config.TextColumn("uf", width=50),
         },
     )
-
-    if filtered.empty:
-        st.info("Nenhuma empresa encontrada.")
-        return
 
     if editable_mode:
         try:
@@ -2044,4 +2166,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
