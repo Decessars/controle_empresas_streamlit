@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.streamlit/secrets.toml
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.bak*
+*.zip
+*.log
+desktop.ini
