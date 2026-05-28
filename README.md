@@ -20,7 +20,7 @@ Se não existir `DATABASE_URL`, o app usa SQLite automaticamente.
 ```powershell
 cd "H:\Meu Drive\2026\Python Contabilidade\#21 Demandas Contabilidade\controle_empresas_streamlit"
 py -m pip install -r requirements.txt
-py -m streamlit run app.py
+py -m streamlit run "Exelencia Contabilidade.py"
 ```
 
 Depois acesse:
@@ -51,7 +51,7 @@ Configure a URL do banco:
 
 ```powershell
 set DATABASE_URL=postgresql+psycopg://usuario:senha@host:5432/banco
-streamlit run app.py
+streamlit run "Exelencia Contabilidade.py"
 ```
 
 Para migrar o `cnpjs.db` local para o PostgreSQL:
@@ -67,7 +67,7 @@ O arquivo `Migrar banco para PostgreSQL.bat` faz a mesma chamada, desde que `DAT
 
 1. Crie um repositório no GitHub com os arquivos desta pasta.
 2. No Streamlit Community Cloud, selecione o repositório.
-3. Use `app.py` como arquivo principal.
+3. Use `Exelencia Contabilidade.py` como arquivo principal.
 4. Cadastre usuários e senhas se for evoluir para acesso externo.
 
 Para ativar senha no Streamlit Cloud, configure os secrets do app assim:

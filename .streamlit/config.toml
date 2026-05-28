@@ -1,6 +1,9 @@
 [server]
 maxUploadSize = 200
 
+[client]
+toolbarMode = "viewer"
+
 [theme]
 base = "light"
 primaryColor = "#2563EB"

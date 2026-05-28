@@ -134,8 +134,13 @@ def apply_nexus_theme() -> None:
             display: none !important;
         }
         .block-container {
-            padding-top: 1.5rem;
+            padding-top: 1.2rem;
             max-width: 1280px;
+        }
+        section[data-testid="stSidebar"] {
+            width: 16rem !important;
+            min-width: 16rem !important;
+            max-width: 16rem !important;
         }
         section[data-testid="stSidebar"] {
             background:
@@ -252,13 +257,29 @@ def apply_nexus_theme() -> None:
             background-color: #ffffff !important;
             color: var(--nexus-text) !important;
         }
+        div[data-testid="stSidebar"] .stButton > button,
+        div[data-testid="stSidebar"] .stLinkButton > a {
+            min-height: 2.15rem !important;
+            padding: 0.25rem 0.6rem !important;
+            font-size: 0.92rem !important;
+        }
+        .top-action-row .stButton > button {
+            width: 100% !important;
+            min-height: 3.1rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
         .nexus-topbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 16px;
             padding: 12px 16px;
-            margin-bottom: 18px;
+            margin: 12px 0 20px;
             background: rgba(255,255,255,.90);
             border: 1px solid var(--nexus-border);
             border-radius: 12px;
@@ -565,8 +586,8 @@ def render_topbar() -> None:
     st.markdown(
         """
         <div class="nexus-topbar">
-            <div class="nexus-brand">DMLS <span>Contabilidade</span></div>
-            <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">Abrir servidor local</a>
+            <div class="nexus-brand">DMLS <span>Contab.</span></div>
+            <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">🖥️ Local</a>
         </div>
         """,
         unsafe_allow_html=True,
@@ -580,6 +601,34 @@ def now_str() -> str:
 def current_competencia() -> str:
     today = date.today()
     return f"{today.year}-{today.month:02d}"
+
+
+def get_setting(key: str, default: str = "") -> str:
+    df = query_df("SELECT value FROM settings WHERE key=?", (key,))
+    if df.empty:
+        return default
+    value = df.iloc[0].get("value", default)
+    return default if value is None else str(value)
+
+
+def set_setting(key: str, value: str) -> None:
+    execute(
+        """
+        INSERT INTO settings (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (key, str(value)),
+    )
+
+
+def parse_competencia(competencia: str) -> tuple[int, int]:
+    try:
+        year_str, month_str = competencia.split("-", 1)
+        return int(year_str), int(month_str)
+    except Exception:
+        today = date.today()
+        return today.year, today.month
 
 
 def database_url() -> str:
@@ -812,6 +861,30 @@ def option_to_code(option: str) -> str:
     return option.split(" - ", 1)[0].strip()
 
 
+def show_table(
+    df: pd.DataFrame,
+    *,
+    key: str,
+    height: int = 420,
+    editable: bool = False,
+    column_config: dict | None = None,
+    disabled: list[str] | bool = True,
+    row_height: int = 30,
+) -> pd.DataFrame:
+    return st.data_editor(
+        df,
+        key=key,
+        width="stretch",
+        height=height,
+        row_height=row_height,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed",
+        disabled=disabled if editable else True,
+        column_config=column_config,
+    )
+
+
 def normalize_cnpj(value: str) -> str:
     digits = "".join(ch for ch in str(value or "") if ch.isdigit())
     if len(digits) != 14:
@@ -820,14 +893,15 @@ def normalize_cnpj(value: str) -> str:
 
 
 def load_empresas(active_only: bool = True) -> pd.DataFrame:
-    where = "WHERE COALESCE(is_ativo,1)=1" if active_only else ""
+    active_expr = "COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END)"
+    where = f"WHERE {active_expr}=1" if active_only else ""
     return query_df(
         f"""
         SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
-               COALESCE(is_ativo,1) AS is_ativo, atualizado_em
+               {active_expr} AS is_ativo, atualizado_em
         FROM empresas
         {where}
         ORDER BY razao_social COLLATE NOCASE
@@ -837,6 +911,7 @@ def load_empresas(active_only: bool = True) -> pd.DataFrame:
 
 def save_empresa(data: dict, empresa_id: int | None = None) -> None:
     timestamp = now_str()
+    is_ativo = 0 if int(data.get("inativo", 0)) else 1
     params = (
         normalize_cnpj(data["cnpj"]),
         data["razao_social"].strip(),
@@ -847,6 +922,7 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
         data.get("cidade", "").strip(),
         data.get("uf", "").strip().upper(),
         int(data.get("inativo", 0)),
+        is_ativo,
         timestamp,
     )
     if empresa_id:
@@ -854,7 +930,7 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
             """
             UPDATE empresas
                SET cnpj=?, razao_social=?, nome_fantasia=?, apelido=?, regime=?,
-                   mensalidade=?, cidade=?, uf=?, inativo=?, atualizado_em=?
+                   mensalidade=?, cidade=?, uf=?, inativo=?, is_ativo=?, atualizado_em=?
              WHERE id=?
             """,
             (*params, int(empresa_id)),
@@ -864,8 +940,8 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
             """
             INSERT INTO empresas
                 (cnpj, razao_social, nome_fantasia, apelido, regime, mensalidade,
-                 cidade, uf, inativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 cidade, uf, inativo, is_ativo, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (*params[:-1], timestamp, timestamp),
         )
@@ -970,8 +1046,8 @@ funcionario = "outra-senha"
         with st.sidebar:
             user = st.session_state.get("auth_user", "")
             if user:
-                st.caption(f"Usuário: {user}")
-            if st.button("Sair"):
+                st.caption(f"👤 {user}")
+            if st.button("🚪 Sair", help="Sair do sistema"):
                 st.session_state.pop("authenticated", None)
                 st.session_state.pop("auth_user", None)
                 st.rerun()
@@ -1001,19 +1077,39 @@ funcionario = "outra-senha"
 
 
 def render_sidebar() -> tuple[str, str]:
-    st.sidebar.caption(f"Banco: {db_label()}")
-    st.sidebar.link_button("Abrir servidor local", "http://localhost:8501/")
-    menu_items = ["Módulos", "Painel", "Empresas", "Demandas", "Automação", "Faturamento MEI", "Backup"]
+    menu_map = {
+        "🏠 Módulos": "Módulos",
+        "📊 Painel": "Painel",
+        "➕ Novo Cliente": "Novo Cliente",
+        "🏢 Empresas": "Empresas",
+        "✅ Demandas": "Demandas",
+        "⚙️ Automação": "Automação",
+        "💰 Faturamento": "Faturamento MEI",
+        "🧰 Backup": "Backup",
+    }
+    menu_items = list(menu_map.keys())
     requested_page = st.query_params.get("page", "Módulos")
-    if requested_page not in menu_items:
-        requested_page = st.session_state.get("page", "Módulos")
-    if requested_page not in menu_items:
-        requested_page = "Módulos"
-    page = st.sidebar.radio("Menu", menu_items, index=menu_items.index(requested_page))
+    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "🏠 Módulos")
+    if requested_label not in menu_items:
+        requested_label = st.session_state.get("page_label", "🏠 Módulos")
+    if requested_label not in menu_items:
+        requested_label = "🏠 Módulos"
+    page_label = st.sidebar.radio("Menu", menu_items, index=menu_items.index(requested_label))
+    page = menu_map[page_label]
+    st.session_state["page_label"] = page_label
     st.session_state["page"] = page
     if st.query_params.get("page") != page:
         st.query_params["page"] = page
-    competencia = st.sidebar.text_input("Competência", value=current_competencia(), help="Formato YYYY-MM")
+    saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+    current_year, current_month = parse_competencia(saved_competencia)
+    years = list(range(current_year - 5, current_year + 6))
+    month_options = [f"{m:02d}" for m in range(1, 13)]
+    y1, y2 = st.sidebar.columns(2)
+    year = y1.selectbox("Ano", years, index=years.index(current_year))
+    month = y2.selectbox("Mês", month_options, index=month_options.index(f"{current_month:02d}"))
+    competencia = f"{int(year)}-{month}"
+    st.session_state["competencia"] = competencia
+    set_setting("ultima_competencia", competencia)
     return page, competencia
 
 
@@ -1082,61 +1178,261 @@ def render_painel(competencia: str) -> None:
         .sort_values(["tipo", "status"])
     )
     st.subheader("Resumo por demanda")
-    st.dataframe(resumo[["demanda", "status", "qtd"]], use_container_width=True, hide_index=True)
+    show_table(
+        resumo[["demanda", "status", "qtd"]],
+        key=f"painel_resumo_{competencia}",
+        height=260,
+        editable=False,
+        disabled=True,
+        column_config={
+            "demanda": st.column_config.TextColumn("Demanda", width=260),
+            "status": st.column_config.TextColumn("Status", width=120),
+            "qtd": st.column_config.NumberColumn("Qtd", width=80),
+        },
+    )
 
     st.subheader("Pendências")
     pendentes = demandas[demandas["feito"] == 0][["demanda", "razao_social", "cnpj", "regime", "observacao"]]
-    st.dataframe(pendentes, use_container_width=True, hide_index=True)
+    show_table(
+        pendentes,
+        key=f"painel_pendentes_{competencia}",
+        height=320,
+        editable=False,
+        disabled=True,
+        column_config={
+            "demanda": st.column_config.TextColumn("Demanda", width=220),
+            "razao_social": st.column_config.TextColumn("Razão social", width=300),
+            "cnpj": st.column_config.TextColumn("CNPJ", width=150),
+            "regime": st.column_config.TextColumn("Regime", width=120),
+            "observacao": st.column_config.TextColumn("Observação", width=260),
+        },
+    )
 
 
 def render_empresas() -> None:
     st.subheader("Empresas")
-    active_only = st.toggle("Mostrar apenas ativas", value=True)
-    empresas = load_empresas(active_only=active_only)
-    st.dataframe(empresas, use_container_width=True, hide_index=True)
 
-    st.divider()
-    ids = empresas["id"].tolist() if not empresas.empty else []
-    selected_id = st.selectbox("Editar empresa existente", [0, *ids], format_func=lambda x: "Nova empresa" if x == 0 else f"#{x}")
-    row = empresas[empresas["id"] == selected_id].iloc[0].to_dict() if selected_id else {}
+    if "empresas_view_mode" not in st.session_state:
+        st.session_state["empresas_view_mode"] = "full"
+    if "empresa_selected_id" not in st.session_state:
+        st.session_state["empresa_selected_id"] = 0
 
-    with st.form("empresa_form"):
-        c1, c2 = st.columns(2)
-        cnpj = c1.text_input("CNPJ", value=row.get("cnpj", ""))
-        razao = c2.text_input("Razão social", value=row.get("razao_social", ""))
-        fantasia = c1.text_input("Nome fantasia", value=row.get("nome_fantasia", ""))
-        apelido = c2.text_input("Apelido", value=row.get("apelido", ""))
-        regime_default = row.get("regime") if row.get("regime") in REGIMES else REGIMES[0]
-        regime = c1.selectbox("Regime", REGIMES, index=REGIMES.index(regime_default))
-        mensalidade = c2.text_input("Mensalidade", value=row.get("mensalidade", ""))
-        cidade = c1.text_input("Cidade", value=row.get("cidade", ""))
-        uf = c2.text_input("UF", value=row.get("uf", ""), max_chars=2)
-        inativo = st.checkbox("Empresa inativa para rotinas mensais", value=bool(row.get("inativo", 0)))
-        submitted = st.form_submit_button("Salvar")
+    with st.container(border=True):
+        f1, f2 = st.columns([2.3, 1.3])
+        search = f1.text_input("Buscar", value=st.session_state.get("empresa_search", ""))
+        regime_filter = f2.selectbox("Regime", ["Todos", *REGIMES], index=0)
+        b1, b2, b3, b4 = st.columns(4)
+        if b1.button("🔄 Visualizar Full"):
+            st.session_state["empresas_view_mode"] = "full"
+            st.rerun()
+        if b2.button("➕ Novo"):
+            st.session_state["page"] = "Novo Cliente"
+            st.query_params["page"] = "Novo Cliente"
+            st.rerun()
+        if b3.button("✅ Ativas"):
+            st.session_state["empresas_view_mode"] = "ativas"
+            st.rerun()
+        if b4.button("📦 Excluídas"):
+            st.session_state["empresas_view_mode"] = "excluidas"
+            st.rerun()
+        st.caption("Use o filtro de busca e os botões para navegar rápido.")
 
-    if submitted:
-        if not cnpj or not razao:
-            st.error("CNPJ e razão social são obrigatórios.")
-        else:
+    if st.session_state["empresas_view_mode"] == "full":
+        empresas = load_empresas(active_only=False)
+    elif st.session_state["empresas_view_mode"] == "ativas":
+        empresas = load_empresas(active_only=True)
+    else:
+        empresas = load_empresas(active_only=False)
+
+    st.session_state["empresa_search"] = search
+    filtered = empresas.copy()
+    if search:
+        q = search.strip().lower()
+        mask = (
+            filtered["cnpj"].astype(str).str.lower().str.contains(q, na=False)
+            | filtered["razao_social"].astype(str).str.lower().str.contains(q, na=False)
+            | filtered["nome_fantasia"].astype(str).str.lower().str.contains(q, na=False)
+            | filtered["apelido"].astype(str).str.lower().str.contains(q, na=False)
+        )
+        filtered = filtered[mask]
+    if regime_filter != "Todos":
+        filtered = filtered[filtered["regime"] == regime_filter]
+    if st.session_state["empresas_view_mode"] == "excluidas":
+        filtered = filtered[filtered["is_ativo"] == 0]
+    elif st.session_state["empresas_view_mode"] == "ativas":
+        filtered = filtered[filtered["is_ativo"] == 1]
+
+    if st.session_state["empresas_view_mode"] == "full":
+        st.markdown("#### Visualizar Full")
+        if st.button("↩️ Sair do Full"):
+            st.session_state["empresas_view_mode"] = "ativas"
+            st.rerun()
+        show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo"]
+        display_df = filtered[show_cols].copy() if not filtered.empty else filtered
+        edited_df = show_table(
+            display_df,
+            key="empresas_editor_full",
+            height=760,
+            editable=True,
+            disabled=["id"],
+            column_config={
+                "id": st.column_config.NumberColumn("id", width=60),
+                "cnpj": st.column_config.TextColumn("cnpj", width=130),
+                "razao_social": st.column_config.TextColumn("razao_social", width=240),
+                "nome_fantasia": st.column_config.TextColumn("nome_fantasia", width=140),
+                "apelido": st.column_config.TextColumn("apelido", width=120),
+                "regime": st.column_config.SelectboxColumn("Regime", options=REGIMES, width=120),
+                "mensalidade": st.column_config.TextColumn("mensalidade", width=100),
+                "cidade": st.column_config.TextColumn("cidade", width=100),
+                "uf": st.column_config.TextColumn("uf", width=50),
+                "inativo": st.column_config.CheckboxColumn("inativo", width=75),
+            },
+        )
+
+        if filtered.empty:
+            st.info("Nenhuma empresa encontrada.")
+            return
+
+        if st.button("💾 Salvar alterações do Full"):
             try:
-                save_empresa(
-                    {
-                        "cnpj": cnpj,
-                        "razao_social": razao,
-                        "nome_fantasia": fantasia,
-                        "apelido": apelido,
-                        "regime": regime,
-                        "mensalidade": mensalidade,
-                        "cidade": cidade,
-                        "uf": uf,
-                        "inativo": inativo,
-                    },
-                    selected_id or None,
-                )
-                st.success("Empresa salva.")
+                changed = 0
+                original = display_df.set_index("id")
+                for _, edited_row in edited_df.iterrows():
+                    empresa_id = int(edited_row["id"])
+                    if empresa_id not in original.index:
+                        continue
+                    orig_row = original.loc[empresa_id]
+                    payload = {
+                        "cnpj": str(edited_row.get("cnpj", "")),
+                        "razao_social": str(edited_row.get("razao_social", "")),
+                        "nome_fantasia": str(edited_row.get("nome_fantasia", "")),
+                        "apelido": str(edited_row.get("apelido", "")),
+                        "regime": str(edited_row.get("regime", "")),
+                        "mensalidade": str(edited_row.get("mensalidade", "")),
+                        "cidade": str(edited_row.get("cidade", "")),
+                        "uf": str(edited_row.get("uf", "")),
+                        "inativo": int(bool(edited_row.get("inativo", False))),
+                    }
+                    if any(str(payload[key]) != str(orig_row[key]) for key in payload):
+                        save_empresa(payload, empresa_id)
+                        changed += 1
+                st.success(f"Alterações salvas. Registros atualizados: {changed}.")
                 st.rerun()
             except Exception as exc:
-                st.error(f"Não foi possível salvar. Verifique se o CNPJ já existe. Detalhe: {exc}")
+                st.error(f"Não foi possível salvar as alterações. Detalhe: {exc}")
+        return
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total", len(filtered))
+    m2.metric("Ativas", int((filtered["is_ativo"] == 1).sum()) if not filtered.empty else 0)
+    m3.metric("Inativas", int((filtered["is_ativo"] == 0).sum()) if not filtered.empty else 0)
+
+    show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo"]
+    display_df = filtered[show_cols].copy() if not filtered.empty else filtered
+    edited_df = show_table(
+        display_df,
+        key="empresas_editor",
+        height=460,
+        editable=True,
+        disabled=["id"],
+        column_config={
+            "id": st.column_config.NumberColumn("id", width=60),
+            "cnpj": st.column_config.TextColumn("cnpj", width=130),
+            "razao_social": st.column_config.TextColumn("razao_social", width=240),
+            "nome_fantasia": st.column_config.TextColumn("nome_fantasia", width=140),
+            "apelido": st.column_config.TextColumn("apelido", width=120),
+            "regime": st.column_config.SelectboxColumn("Regime", options=REGIMES, width=120),
+            "mensalidade": st.column_config.TextColumn("mensalidade", width=100),
+            "cidade": st.column_config.TextColumn("cidade", width=100),
+            "uf": st.column_config.TextColumn("uf", width=50),
+            "inativo": st.column_config.CheckboxColumn("inativo", width=75),
+        },
+    )
+
+    if filtered.empty:
+        st.info("Nenhuma empresa encontrada.")
+        return
+
+    st.caption("Dica: dê duplo clique em uma célula para editar. Depois clique em 💾 Salvar alterações.")
+    if st.button("💾 Salvar alterações"):
+        try:
+            changed = 0
+            original = display_df.set_index("id")
+            for _, edited_row in edited_df.iterrows():
+                empresa_id = int(edited_row["id"])
+                if empresa_id not in original.index:
+                    continue
+                orig_row = original.loc[empresa_id]
+                payload = {
+                    "cnpj": str(edited_row.get("cnpj", "")),
+                    "razao_social": str(edited_row.get("razao_social", "")),
+                    "nome_fantasia": str(edited_row.get("nome_fantasia", "")),
+                    "apelido": str(edited_row.get("apelido", "")),
+                    "regime": str(edited_row.get("regime", "")),
+                    "mensalidade": str(edited_row.get("mensalidade", "")),
+                    "cidade": str(edited_row.get("cidade", "")),
+                    "uf": str(edited_row.get("uf", "")),
+                    "inativo": int(bool(edited_row.get("inativo", False))),
+                }
+                if any(str(payload[key]) != str(orig_row[key]) for key in payload):
+                    save_empresa(payload, empresa_id)
+                    changed += 1
+            st.success(f"Alterações salvas. Registros atualizados: {changed}.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Não foi possível salvar as alterações. Detalhe: {exc}")
+
+
+def render_novo_cliente() -> None:
+    st.subheader("Novo cliente")
+    st.caption("Preencha os campos abaixo para criar um novo cadastro.")
+
+    with st.container(border=True):
+        with st.form("novo_cliente_form"):
+            c1, c2 = st.columns(2)
+            cnpj = c1.text_input("CNPJ")
+            razao = c2.text_input("Razão social")
+            fantasia = c1.text_input("Nome fantasia")
+            apelido = c2.text_input("Apelido")
+            regime = c1.selectbox("Regime", REGIMES, index=0)
+            mensalidade = c2.text_input("Mensalidade")
+            cidade = c1.text_input("Cidade")
+            uf = c2.text_input("UF", max_chars=2)
+            inativo = st.checkbox("Inativa", value=False)
+            csave, ccancel = st.columns(2)
+            save_new = csave.form_submit_button("💾 Salvar novo")
+            cancel_new = ccancel.form_submit_button("↩️ Voltar")
+
+        if cancel_new:
+            st.session_state["page"] = "Empresas"
+            st.query_params["page"] = "Empresas"
+            st.rerun()
+
+        if save_new:
+            if not cnpj or not razao:
+                st.error("CNPJ e razão social são obrigatórios.")
+            else:
+                try:
+                    save_empresa(
+                        {
+                            "cnpj": cnpj,
+                            "razao_social": razao,
+                            "nome_fantasia": fantasia,
+                            "apelido": apelido,
+                            "regime": regime,
+                            "mensalidade": mensalidade,
+                            "cidade": cidade,
+                            "uf": uf,
+                            "inativo": inativo,
+                        },
+                        None,
+                    )
+                    st.success("Novo cliente salvo.")
+                    st.session_state["page"] = "Empresas"
+                    st.query_params["page"] = "Empresas"
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Não foi possível salvar o novo cliente. Detalhe: {exc}")
 
 
 def render_demandas(competencia: str) -> None:
@@ -1176,10 +1472,21 @@ def render_demandas(competencia: str) -> None:
     elif status_filter == "Concluídas":
         filtered = filtered[filtered["feito"] == 1]
 
-    st.dataframe(
+    show_table(
         filtered[["id", "demanda", "razao_social", "cnpj", "status", "observacao", "atualizado_em"]],
-        use_container_width=True,
-        hide_index=True,
+        key=f"demandas_table_{competencia}_{tipo_filter}_{status_filter}",
+        height=360,
+        editable=False,
+        disabled=True,
+        column_config={
+            "id": st.column_config.NumberColumn("id", width=60),
+            "demanda": st.column_config.TextColumn("Demanda", width=220),
+            "razao_social": st.column_config.TextColumn("Razão social", width=280),
+            "cnpj": st.column_config.TextColumn("CNPJ", width=150),
+            "status": st.column_config.TextColumn("Status", width=120),
+            "observacao": st.column_config.TextColumn("Observação", width=250),
+            "atualizado_em": st.column_config.TextColumn("Atualizado em", width=160),
+        },
     )
 
     st.divider()
@@ -1233,7 +1540,17 @@ def render_automacao() -> None:
             for file in files:
                 data = file.getvalue()
                 rows.append({"arquivo": file.name, "tamanho_bytes": len(data)})
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            show_table(
+                pd.DataFrame(rows),
+                key=f"leitura_fiscal_{len(rows)}",
+                height=240,
+                editable=False,
+                disabled=True,
+                column_config={
+                    "arquivo": st.column_config.TextColumn("Arquivo", width=260),
+                    "tamanho_bytes": st.column_config.NumberColumn("Tamanho (bytes)", width=140),
+                },
+            )
             st.warning("Leitura fiscal detalhada será conectada na próxima etapa para espelhar o relatório do desktop.")
 
 
@@ -1258,7 +1575,23 @@ def render_faturamento(competencia: str) -> None:
         """,
         (competencia,),
     )
-    st.dataframe(rows, use_container_width=True, hide_index=True)
+    show_table(
+        rows,
+        key=f"faturamento_table_{competencia}",
+        height=260,
+        editable=False,
+        disabled=True,
+        column_config={
+            "id": st.column_config.NumberColumn("id", width=60),
+            "empresa_id": st.column_config.NumberColumn("empresa_id", width=90),
+            "razao_social": st.column_config.TextColumn("Razão social", width=260),
+            "competencia": st.column_config.TextColumn("Competência", width=110),
+            "valor": st.column_config.TextColumn("Valor", width=90),
+            "valor_nota_fiscal": st.column_config.TextColumn("NF", width=90),
+            "valor_mov_extrato": st.column_config.TextColumn("Extrato", width=90),
+            "observacao": st.column_config.TextColumn("Observação", width=220),
+        },
+    )
 
     with st.form("faturamento_form"):
         empresa_id = st.selectbox(
@@ -1330,7 +1663,7 @@ def render_backup() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Controle de Empresas", layout="wide")
+    st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="collapsed")
     apply_nexus_theme()
 
     if not require_login():
@@ -1350,6 +1683,8 @@ def main() -> None:
         render_modulos()
     elif page == "Painel":
         render_painel(competencia)
+    elif page == "Novo Cliente":
+        render_novo_cliente()
     elif page == "Empresas":
         render_empresas()
     elif page == "Demandas":
