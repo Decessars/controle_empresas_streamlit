@@ -781,6 +781,20 @@ def init_db() -> None:
         )
         execute(
             """
+            CREATE TABLE IF NOT EXISTS historico_empresas (
+                id SERIAL PRIMARY KEY,
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+                acao TEXT NOT NULL,
+                usuario TEXT NOT NULL,
+                resumo TEXT,
+                snapshot_anterior TEXT,
+                snapshot_atual TEXT,
+                criado_em TEXT
+            )
+            """
+        )
+        execute(
+            """
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -834,6 +848,21 @@ def init_db() -> None:
                 atualizado_em TEXT,
                 UNIQUE (empresa_id, competencia),
                 FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+            )
+            """
+            )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS historico_empresas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                empresa_id INTEGER NOT NULL,
+                acao TEXT NOT NULL,
+                usuario TEXT NOT NULL,
+                resumo TEXT,
+                snapshot_anterior TEXT,
+                snapshot_atual TEXT,
+                criado_em TEXT,
+                FOREIGN KEY (empresa_id) REFERENCES empresas(id)
             )
             """
             )
@@ -915,20 +944,21 @@ def load_empresas(active_only: bool = True) -> pd.DataFrame:
 def save_empresa(data: dict, empresa_id: int | None = None) -> None:
     timestamp = now_str()
     is_ativo = 0 if int(data.get("inativo", 0)) else 1
-    params = (
-        normalize_cnpj(data["cnpj"]),
-        data["razao_social"].strip(),
-        data.get("nome_fantasia", "").strip(),
-        data.get("apelido", "").strip(),
-        data.get("regime", "").strip(),
-        data.get("mensalidade", "").strip(),
-        data.get("cidade", "").strip(),
-        data.get("uf", "").strip().upper(),
-        int(data.get("inativo", 0)),
-        is_ativo,
-        timestamp,
-    )
+    normalized = {
+        "cnpj": normalize_cnpj(data["cnpj"]),
+        "razao_social": data["razao_social"].strip(),
+        "nome_fantasia": data.get("nome_fantasia", "").strip(),
+        "apelido": data.get("apelido", "").strip(),
+        "regime": data.get("regime", "").strip(),
+        "mensalidade": data.get("mensalidade", "").strip(),
+        "cidade": data.get("cidade", "").strip(),
+        "uf": data.get("uf", "").strip().upper(),
+        "inativo": int(data.get("inativo", 0)),
+        "is_ativo": is_ativo,
+        "timestamp": timestamp,
+    }
     if empresa_id:
+        before = empresa_snapshot(empresa_row(int(empresa_id)))
         execute(
             """
             UPDATE empresas
@@ -936,8 +966,32 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                    mensalidade=?, cidade=?, uf=?, inativo=?, is_ativo=?, atualizado_em=?
              WHERE id=?
             """,
-            (*params, int(empresa_id)),
+            (
+                normalized["cnpj"],
+                normalized["razao_social"],
+                normalized["nome_fantasia"],
+                normalized["apelido"],
+                normalized["regime"],
+                normalized["mensalidade"],
+                normalized["cidade"],
+                normalized["uf"],
+                normalized["inativo"],
+                normalized["is_ativo"],
+                timestamp,
+                int(empresa_id),
+            ),
         )
+        after = empresa_snapshot(empresa_row(int(empresa_id)))
+        if before and after and any(str(before.get(key, "")) != str(after.get(key, "")) for key in ["cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo", "is_ativo"]):
+            before_active = int(before.get("is_ativo", 1) or 1)
+            after_active = int(after.get("is_ativo", 1) or 1)
+            if before_active == 1 and after_active == 0:
+                action = "EXCLUSAO"
+            elif before_active == 0 and after_active == 1:
+                action = "REATIVACAO"
+            else:
+                action = "ALTERACAO"
+            record_empresa_history(int(empresa_id), action, before, after)
     else:
         execute(
             """
@@ -946,8 +1000,43 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                  cidade, uf, inativo, is_ativo, criado_em, atualizado_em)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (*params[:-1], timestamp, timestamp),
+            (
+                normalized["cnpj"],
+                normalized["razao_social"],
+                normalized["nome_fantasia"],
+                normalized["apelido"],
+                normalized["regime"],
+                normalized["mensalidade"],
+                normalized["cidade"],
+                normalized["uf"],
+                normalized["inativo"],
+                normalized["is_ativo"],
+                timestamp,
+                timestamp,
+            ),
         )
+        created = empresa_snapshot(empresa_row_by_cnpj(normalized["cnpj"]))
+        if created:
+            record_empresa_history(int(created.get("id", 0) or 0), "INCLUSAO", {}, created)
+
+
+def empresa_row_by_cnpj(cnpj: str) -> dict:
+    df = query_df(
+        """
+        SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
+               COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
+               COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
+               COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
+               COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
+               atualizado_em, criado_em
+          FROM empresas
+         WHERE cnpj=?
+         ORDER BY id DESC
+         LIMIT 1
+        """,
+        (cnpj,),
+    )
+    return df.iloc[0].to_dict() if not df.empty else {}
 
 
 def load_demandas(competencia: str) -> pd.DataFrame:
@@ -1413,11 +1502,12 @@ def render_empresas() -> None:
 
     show_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]
     display_df = filtered[show_cols].copy() if not filtered.empty else filtered
+    editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
     edited_df = show_table(
         display_df,
         key="empresas_editor",
         height=460,
-        editable=True,
+        editable=editable_mode,
         disabled=["id"],
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
@@ -1437,7 +1527,7 @@ def render_empresas() -> None:
         return
 
     st.caption("Dica: d? duplo clique em uma c?lula para editar. Depois clique em ?? Salvar altera??es.")
-    if st.button("?? Salvar altera??es"):
+    if editable_mode and st.button("?? Salvar altera??es"):
         try:
             changed = 0
             original = display_df.set_index("id")
@@ -1463,6 +1553,45 @@ def render_empresas() -> None:
             st.rerun()
         except Exception as exc:
             st.error(f"N?o foi poss?vel salvar as altera??es. Detalhe: {exc}")
+    elif not editable_mode:
+        st.info("A visão de excluídas é somente leitura. Use 'Exibir Ativas' para editar registros.")
+
+    st.divider()
+    with st.expander("Hist?rico de altera??es", expanded=False):
+        history_source = load_empresas(active_only=False)
+        if history_source.empty:
+            st.info("Sem empresas para consultar hist?rico.")
+        else:
+            selected_id = st.selectbox(
+                "Empresa",
+                history_source["id"].tolist(),
+                format_func=lambda eid: f"#{eid} - {history_source.loc[history_source['id'] == eid, 'razao_social'].iloc[0]}",
+                key="empresa_history_select",
+            )
+            history = load_empresa_history(int(selected_id))
+            if history.empty:
+                st.info("Nenhum hist?rico encontrado para esta empresa.")
+            else:
+                show_table(
+                    history[["acao", "usuario", "resumo", "criado_em"]],
+                    key=f"empresa_history_table_{selected_id}",
+                    height=260,
+                    editable=False,
+                    disabled=True,
+                    column_config={
+                        "acao": st.column_config.TextColumn("A??o", width=120),
+                        "usuario": st.column_config.TextColumn("Usu?rio", width=160),
+                        "resumo": st.column_config.TextColumn("Resumo", width=280),
+                        "criado_em": st.column_config.TextColumn("Data/Hora", width=160),
+                    },
+                )
+                with st.expander("Ver snapshots do registro", expanded=False):
+                    st.dataframe(
+                        history[["snapshot_anterior", "snapshot_atual"]],
+                        use_container_width=True,
+                        hide_index=True,
+                    )
+
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
@@ -1713,7 +1842,7 @@ def render_backup() -> None:
     if using_postgres():
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for table in ["empresas", "demandas", "faturamento_mei", "settings"]:
+            for table in ["empresas", "demandas", "historico_empresas", "faturamento_mei", "settings"]:
                 df = query_df(f"SELECT * FROM {table}")
                 zf.writestr(f"{table}.csv", df.to_csv(index=False).encode("utf-8-sig"))
         st.download_button(
