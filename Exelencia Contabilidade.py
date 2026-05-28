@@ -1547,15 +1547,14 @@ def render_empresas() -> None:
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
 
     if editable_mode:
-        save_col, _ = st.columns([0.18, 0.82])
-        save_clicked = save_col.button("?? Salvar", use_container_width=True)
+        save_clicked = st.button("💾 Salvar", use_container_width=False)
     else:
         save_clicked = False
 
     edited_df = show_table(
         display_df,
         key="empresas_editor",
-        height=620,
+        height=700,
         editable=editable_mode,
         disabled=["id"],
         column_config={
