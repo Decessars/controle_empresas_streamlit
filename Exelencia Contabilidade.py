@@ -1178,6 +1178,24 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
 
 
 
+def empresa_row(empresa_id: int) -> dict:
+    df = query_df(
+        """
+        SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
+               COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
+               COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
+               COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
+               COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
+               atualizado_em, criado_em
+          FROM empresas
+         WHERE id=?
+         LIMIT 1
+        """,
+        (int(empresa_id),),
+    )
+    return df.iloc[0].to_dict() if not df.empty else {}
+
+
 def empresa_snapshot(row: dict | None) -> dict:
     if not row:
         return {}
