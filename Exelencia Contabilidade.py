@@ -137,8 +137,25 @@ def apply_nexus_theme() -> None:
             display: none !important;
         }
         .block-container {
-            padding-top: 1.2rem;
+            padding-top: 0.6rem;
             max-width: 1280px;
+        }
+        h1 {
+            margin-bottom: 0.45rem !important;
+        }
+        h2, h3 {
+            margin-bottom: 0.35rem !important;
+        }
+        div[data-testid="stCaptionContainer"] {
+            margin-top: 0.1rem !important;
+            margin-bottom: 0.15rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            margin-bottom: 0.65rem !important;
+        }
+        div[data-testid="stVerticalBlockBorderWrapper"] > div {
+            padding-top: 0.45rem !important;
+            padding-bottom: 0.45rem !important;
         }
         section[data-testid="stSidebar"] {
             width: 16rem !important;
@@ -178,7 +195,7 @@ def apply_nexus_theme() -> None:
             background: rgba(255,255,255,.92);
             border: 1px solid var(--nexus-border);
             border-radius: 12px;
-            padding: 16px 18px;
+            padding: 10px 14px;
             box-shadow: 0 14px 28px rgba(15,23,42,.08);
         }
         div[data-testid="stMetric"] label, div[data-testid="stMetric"] [data-testid="stMetricValue"] {
@@ -454,7 +471,7 @@ def apply_nexus_theme() -> None:
         }
         .launcher-shell {
             max-width: 1160px;
-            padding: 0 0 18px;
+            padding: 0 0 10px;
             background: transparent;
             border: 0;
             box-shadow: none;
@@ -464,19 +481,19 @@ def apply_nexus_theme() -> None:
             font-size: 12px;
             font-weight: 800;
             text-transform: uppercase;
-            margin-bottom: 18px;
+            margin-bottom: 10px;
         }
         .launcher-title {
             color: var(--nexus-text);
-            font-size: 31px;
+            font-size: 28px;
             line-height: 1.1;
             font-weight: 900;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .launcher-subtitle {
             color: var(--nexus-muted);
             font-size: 14px;
-            margin-bottom: 18px;
+            margin-bottom: 10px;
         }
         .launcher-grid-wrap {
             max-width: 1160px;
