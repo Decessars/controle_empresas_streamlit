@@ -4,6 +4,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import base64
 import hashlib
 import hmac
 import secrets
@@ -114,7 +115,7 @@ MODULES = [
         "tag": "MEI",
         "icon": "F",
         "enabled": False,
-        "page": "Faturamento MEI",
+        "page": "Faturamento",
     },
     {
         "title": "Relatorios Inteligentes",
@@ -142,7 +143,7 @@ NAV_MENU = {
     "🏢 Empresas": "Empresas",
     "📋 Demandas": "Demandas",
     "🤖 Automação": "Automacao",
-    "💰 Faturamento": "Faturamento MEI",
+    "💰 Faturamento": "Faturamento",
     "💾 Backup": "Backup",
 }
 
@@ -230,18 +231,18 @@ def apply_nexus_theme() -> None:
             min-width: 16rem !important;
             max-width: 16rem !important;
         }
-        section[data-testid="stSidebar"] img {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            object-fit: contain;
-            image-rendering: auto;
-        }
-        .logo-sidebar-box {
+        .sidebar-logo {
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 8px 4px 14px 4px;
+        }
+        .sidebar-logo img {
+            max-width: 120px !important;
+            height: auto !important;
+            object-fit: contain !important;
+            display: block;
+            margin: 0 auto 14px auto;
         }
         section[data-testid="stSidebar"] {
             background:
@@ -720,43 +721,18 @@ def apply_nexus_theme() -> None:
             font-size: 13px;
             line-height: 1.45;
         }
-        div[class*="st-key-access_module_"] button {
-            min-height: 0;
-            padding: 0 !important;
-            background: transparent !important;
-            border: 0 !important;
-            color: #2563eb !important;
-            box-shadow: none !important;
-            font-family: "Bahnschrift", "Segoe UI", sans-serif;
-            font-size: 12px;
-            font-weight: 900;
-            text-align: left;
+        div[class*="st-key-module_open_"] button {
+            min-height: 42px !important;
+            padding: 0.4rem 0.85rem !important;
+            border-radius: 10px !important;
+            font-weight: 800 !important;
         }
-        div[class*="st-key-access_module_"] button p {
-            color: #2563eb !important;
-            font-weight: 900;
-        }
-        div[class*="st-key-access_module_"] button:hover p {
-            color: #1d4ed8 !important;
-        }
-        div[class*="st-key-access_module_"],
-        div[class*="st-key-disabled_module_"] {
-            margin-top: -54px;
-            margin-left: 16px;
-            margin-bottom: 28px;
-            width: fit-content;
-        }
-        div[class*="st-key-disabled_module_"] button {
-            min-height: 0;
-            padding: 0 !important;
-            background: transparent !important;
-            border: 0 !important;
-            box-shadow: none !important;
-            cursor: default;
-        }
-        div[class*="st-key-disabled_module_"] button p {
-            color: #94a3b8 !important;
-            font-weight: 900;
+        div[class*="st-key-module_disabled_"] button {
+            min-height: 42px !important;
+            padding: 0.4rem 0.85rem !important;
+            border-radius: 10px !important;
+            font-weight: 800 !important;
+            cursor: default !important;
         }
         </style>
         """,
@@ -764,23 +740,60 @@ def apply_nexus_theme() -> None:
     )
 
 
-def render_company_logo(width: int = 180, location: str = "sidebar") -> None:
+def render_company_logo(width: int = 115, location: str = "sidebar") -> None:
     if LOGO_PATH.exists():
-        st.markdown('<div class="logo-sidebar-box">', unsafe_allow_html=True)
-        st.image(str(LOGO_PATH), width=width)
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
+        logo_bytes = LOGO_PATH.read_bytes()
+        logo_b64 = base64.b64encode(logo_bytes).decode("ascii")
         st.markdown(
-            '<div class="logo-sidebar-box"><div style="text-align:center; font-weight:800; letter-spacing:0.04em;">EXCELENCIA CONTABILIDADE</div></div>',
+            f"""
+            <div class="sidebar-logo">
+                <img src="data:image/png;base64,{logo_b64}" alt="Excelencia Contabilidade" width="{width}" />
+            </div>
+            """,
             unsafe_allow_html=True,
         )
+    else:
+        st.markdown(
+            '<div class="sidebar-logo"><div style="text-align:center; font-weight:800; letter-spacing:0.04em;">EXCELENCIA CONTABILIDADE</div></div>',
+            unsafe_allow_html=True,
+        )
+
+
+def normalize_page(page: str) -> str:
+    page_txt = str(page or "").strip()
+    aliases = {
+        "Automação": "Automacao",
+        "Automacao": "Automacao",
+        "Faturamento": "Faturamento MEI",
+        "Faturamento MEI": "Faturamento MEI",
+        "Módulos": "Modulos",
+        "Modulos": "Modulos",
+        "Painel de Controle 2026": "Painel",
+    }
+    return aliases.get(page_txt, page_txt)
+
+
+def normalize_page(page: str) -> str:
+    page_txt = str(page or "").strip()
+    aliases = {
+        "Automação": "Automacao",
+        "AutomaÃ§Ã£o": "Automacao",
+        "Automacao": "Automacao",
+        "Faturamento": "Faturamento",
+        "Faturamento MEI": "Faturamento",
+        "Módulos": "Modulos",
+        "MÃ³dulos": "Modulos",
+        "Modulos": "Modulos",
+        "Painel de Controle 2026": "Painel",
+    }
+    return aliases.get(page_txt, page_txt)
 
 
 def render_topbar() -> None:
     if "global_menu_open" not in st.session_state:
         st.session_state["global_menu_open"] = False
 
-    cols = st.columns([6.8, 1.1, 1.2], vertical_alignment="center")
+    cols = st.columns([6.2, 1.0, 1.0, 1.2], vertical_alignment="center")
     cols[0].markdown(
         """
         <div class="nexus-topbar">
@@ -789,15 +802,11 @@ def render_topbar() -> None:
         """,
         unsafe_allow_html=True,
     )
-    cols[1].markdown(
-        """
-        <div class="nexus-topbar nexus-topbar-link">
-            <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">Local</a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    if cols[2].button("\u2630 Menu", key="global_menu_toggle"):
+    if cols[1].button("🏠 Home", key="topbar_home", use_container_width=True):
+        navigate_to("Modulos", "📂 Módulos")
+    if cols[2].button("⬅️ Voltar", key="topbar_back", use_container_width=True):
+        go_back()
+    if cols[3].button("\u2630 Menu", key="global_menu_toggle", use_container_width=True):
         st.session_state["global_menu_open"] = not st.session_state.get("global_menu_open", False)
 
     if st.session_state.get("global_menu_open", False):
@@ -811,19 +820,42 @@ def render_topbar() -> None:
                 for idx, (label, page) in enumerate(row):
                     button_type = "primary" if st.session_state.get("page") == page else "secondary"
                     with row_cols[idx]:
-                        if st.button(label, key=f"global_menu_{page}", type=button_type):
+                        if st.button(label, key=f"global_menu_{page}", type=button_type, use_container_width=False):
                             st.session_state["global_menu_open"] = False
-                            navigate_to_page(page, label)
+                            navigate_to(page, label)
         st.markdown("</div>", unsafe_allow_html=True)
+
+
+def navigate_to(page: str, label: str | None = None, push_history: bool = True) -> None:
+    page = normalize_page(page)
+    current = str(st.session_state.get("page") or "").strip()
+    if push_history and current and current != page:
+        history = st.session_state.setdefault("nav_history", [])
+        if not history or history[-1] != current:
+            history.append(current)
+        st.session_state["nav_history"] = history[-20:]
+    if label is None:
+        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == page), page)
+    st.session_state["page"] = page
+    st.session_state["page_label"] = label
+    st.query_params["page"] = page
+    st.rerun()
+
+
+def go_back() -> None:
+    history = st.session_state.get("nav_history", [])
+    if history:
+        previous = history.pop()
+        st.session_state["nav_history"] = history
+        navigate_to(previous, next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == previous), previous), push_history=False)
+    else:
+        navigate_to("Modulos", "📂 Módulos", push_history=False)
 
 
 def navigate_to_page(page: str, page_label: str | None = None) -> None:
     if page_label is None:
         page_label = next((label for label, value in NAV_MENU.items() if value == page), page)
-    st.session_state["page"] = page
-    st.session_state["page_label"] = page_label
-    st.query_params["page"] = page
-    st.rerun()
+    navigate_to(page, page_label)
 
 
 def normalize_username(value: str) -> str:
@@ -2881,18 +2913,18 @@ def render_sidebar() -> tuple[str, str]:
         "🏢 Empresas": "Empresas",
         "📋 Demandas": "Demandas",
         "🤖 Automação": "Automacao",
-        "💰 Faturamento": "Faturamento MEI",
+        "💰 Faturamento": "Faturamento",
         "💾 Backup": "Backup",
     }
     menu_items = list(menu_map.keys())
-    requested_page = st.query_params.get("page", "Modulos")
+    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Modulos")) or "Modulos")
     requested_label = next((label for label, page in menu_map.items() if page == requested_page), "📂 Módulos")
     if requested_label not in menu_items:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_items:
         requested_label = "📂 Módulos"
     with st.sidebar:
-        render_company_logo(width=170, location="sidebar")
+        render_company_logo()
         page_label = st.radio("Menu", menu_items, index=menu_items.index(requested_label))
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
@@ -3046,13 +3078,13 @@ def render_sidebar_secure() -> tuple[str, str]:
         "🏢 Empresas": "Empresas",
         "📋 Demandas": "Demandas",
         "🤖 Automação": "Automacao",
-        "💰 Faturamento": "Faturamento MEI",
+        "💰 Faturamento": "Faturamento",
         "💾 Backup": "Backup",
     }
     if can_access_users_page():
         menu_map["👥 Usuários"] = "usuarios"
 
-    requested_page = str(st.query_params.get("page", "Modulos"))
+    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Modulos")) or "Modulos")
     if requested_page == "usuarios" and not can_access_users_page():
         st.warning("Você não tem permissão para acessar esta área.")
         requested_page = "Modulos"
@@ -3067,7 +3099,7 @@ def render_sidebar_secure() -> tuple[str, str]:
         requested_label = "📂 Módulos"
 
     with st.sidebar:
-        render_company_logo(width=170, location="sidebar")
+        render_company_logo()
         active_now = load_active_sessions()
         st.markdown(f"**Usuário:** {current_user_display_name()}")
         st.caption(f"Perfil: {user_role_label(current_user_role())}")
@@ -3367,12 +3399,12 @@ def render_modulos() -> None:
                     unsafe_allow_html=True,
                 )
                 if enabled:
-                    if st.button("Acessar modulo >", key=f"access_module_{safe_key}"):
-                        target = str(item["page"])
-                        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == target), target)
+                    target = normalize_page(str(item["page"]))
+                    label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == target), item["title"])
+                    if st.button("🚀 Acessar módulo", key=f"module_open_{safe_key}", use_container_width=False):
                         navigate_to_page(target, label)
                 else:
-                    st.button("Disponivel em breve", key=f"disabled_module_{safe_key}", disabled=True)
+                    st.button("Disponível em breve", key=f"module_disabled_{safe_key}", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -3675,6 +3707,156 @@ def render_empresa_cadastro_on_panel() -> None:
                     st.rerun()
 
 
+def reset_empresa_cadastro_on_state() -> None:
+    st.session_state["show_cadastro_on"] = False
+    st.session_state["empresa_cadastro_on_mode"] = "lookup"
+    st.session_state["empresa_cadastro_on_result"] = {}
+    st.session_state["empresa_cadastro_on_error"] = ""
+    st.session_state["empresa_cadastro_on_existing_id"] = 0
+    st.session_state["empresa_cadastro_on_lookup_value"] = ""
+
+
+def clear_empresa_cadastro_on_state() -> None:
+    st.session_state["empresa_cadastro_on_mode"] = "lookup"
+    st.session_state["empresa_cadastro_on_result"] = {}
+    st.session_state["empresa_cadastro_on_error"] = ""
+    st.session_state["empresa_cadastro_on_existing_id"] = 0
+    st.session_state["empresa_cadastro_on_lookup_value"] = ""
+
+
+def render_empresa_cadastro_on_panel() -> None:
+    if not st.session_state.get("show_cadastro_on", False):
+        return
+
+    with st.container(border=True):
+        head_left, head_right = st.columns([3, 1])
+        head_left.markdown(
+            "<h5 style='margin-top:0;margin-bottom:4px;'>Cadastro On / Incluir por CNPJ</h5>",
+            unsafe_allow_html=True,
+        )
+        if head_right.button("❌ Fechar Cadastro On", use_container_width=True):
+            reset_empresa_cadastro_on_state()
+            st.rerun()
+
+        st.caption("Digite o CNPJ, busque os dados e complete manualmente antes de salvar.")
+
+        with st.form("form_cadastro_on_cnpj", clear_on_submit=False):
+            lookup_value = st.text_input(
+                "CNPJ",
+                value=str(st.session_state.get("empresa_cadastro_on_lookup_value", "")),
+                placeholder="Digite apenas números",
+            )
+            submitted_lookup = st.form_submit_button("🔎 Buscar dados")
+
+        if submitted_lookup:
+            digits = cnpj_digits(lookup_value)
+            st.session_state["empresa_cadastro_on_lookup_value"] = digits
+            if len(digits) != 14:
+                st.session_state["empresa_cadastro_on_error"] = "CNPJ inválido. Informe 14 dígitos."
+                st.session_state["empresa_cadastro_on_mode"] = "lookup"
+                st.rerun()
+
+            fetched = {}
+            try:
+                fetched = fetch_empresa_cadastro_on(digits)
+            except Exception as exc:
+                st.session_state["empresa_cadastro_on_error"] = str(exc) or "Falha ao buscar dados do CNPJ."
+
+            existing = empresa_row_by_cnpj(normalize_cnpj(digits))
+            if existing:
+                st.warning("CNPJ já cadastrado.")
+                st.session_state["empresa_cadastro_on_existing_id"] = int(existing.get("id", 0) or 0)
+                base_row = {**fetched, **existing}
+            else:
+                st.session_state["empresa_cadastro_on_existing_id"] = 0
+                base_row = fetched
+
+            base_row["cnpj"] = normalize_cnpj(digits)
+            st.session_state["empresa_cadastro_on_result"] = base_row
+            st.session_state["empresa_cadastro_on_mode"] = "edit"
+            st.rerun()
+
+        if st.session_state.get("empresa_cadastro_on_error"):
+            st.error(st.session_state["empresa_cadastro_on_error"])
+
+        base_row = st.session_state.get("empresa_cadastro_on_result") or {}
+        if st.session_state.get("empresa_cadastro_on_mode") == "edit":
+            with st.container(border=True):
+                st.markdown("#### Dados cadastrais")
+                with st.form("form_cadastro_on_dados", clear_on_submit=False):
+                    c1, c2 = st.columns(2)
+                    cnpj = c1.text_input("CNPJ", value=str(base_row.get("cnpj", st.session_state.get("empresa_cadastro_on_lookup_value", ""))), disabled=True)
+                    razao = c2.text_input("Razão social", value=str(base_row.get("razao_social", "")))
+                    fantasia = c1.text_input("Nome fantasia", value=str(base_row.get("nome_fantasia", "")))
+                    apelido = c2.text_input("Apelido", value=str(base_row.get("apelido", "")))
+                    regime = c1.selectbox(
+                        "Regime",
+                        REGIMES,
+                        index=REGIMES.index(_regime_option(base_row.get("regime", REGIMES[0]))) if _regime_option(base_row.get("regime", REGIMES[0])) in REGIMES else 0,
+                    )
+                    abertura = c2.text_input("Abertura", value=str(base_row.get("abertura", "")))
+                    natureza_juridica = c1.text_input("Natureza jurídica", value=str(base_row.get("natureza_juridica", "")))
+                    situacao = c2.text_input("Situação", value=str(base_row.get("situacao", "")))
+                    capital_social = c1.text_input("Capital social", value=str(base_row.get("capital_social", "")))
+                    porte = c2.text_input("Porte", value=str(base_row.get("porte", "")))
+                    cidade = c1.text_input("Cidade", value=str(base_row.get("cidade", "")))
+                    uf = c2.text_input("UF", value=str(base_row.get("uf", "")), max_chars=2)
+                    simples_optante = c1.checkbox("Simples optante", value=int(base_row.get("simples_optante", 0) or 0) == 1)
+                    mei_optante = c2.checkbox("MEI optante", value=int(base_row.get("mei_optante", 0) or 0) == 1)
+                    mensalidade = c1.text_input("Mensalidade", value=str(base_row.get("mensalidade", "")))
+                    inativo = c2.checkbox("Inativa", value=int(base_row.get("inativo", 0) or 0) == 1)
+
+                    b1, b2, b3 = st.columns(3)
+                    save_clicked = b1.form_submit_button("💾 Salvar cliente")
+                    clear_clicked = b2.form_submit_button("🧹 Limpar")
+                    cancel_clicked = b3.form_submit_button("❌ Cancelar")
+
+                if clear_clicked:
+                    clear_empresa_cadastro_on_state()
+                    st.rerun()
+
+                if cancel_clicked:
+                    reset_empresa_cadastro_on_state()
+                    st.rerun()
+
+                if save_clicked:
+                    if len(cnpj_digits(cnpj)) != 14:
+                        st.error("CNPJ inválido. Informe 14 dígitos.")
+                    elif not razao.strip():
+                        st.error("Razão social é obrigatória.")
+                    else:
+                        payload = {
+                            "cnpj": cnpj,
+                            "razao_social": razao,
+                            "nome_fantasia": fantasia,
+                            "apelido": apelido,
+                            "regime": regime,
+                            "abertura": abertura,
+                            "natureza_juridica": natureza_juridica,
+                            "situacao": situacao,
+                            "capital_social": capital_social,
+                            "cidade": cidade,
+                            "uf": uf,
+                            "porte": porte,
+                            "simples_optante": 1 if simples_optante else 0,
+                            "mei_optante": 1 if mei_optante else 0,
+                            "mensalidade": mensalidade,
+                            "inativo": 1 if inativo else 0,
+                        }
+                        existing_id = int(st.session_state.get("empresa_cadastro_on_existing_id", 0) or 0)
+                        if not existing_id:
+                            existing_now = empresa_row_by_cnpj(normalize_cnpj(cnpj))
+                            if existing_now:
+                                existing_id = int(existing_now.get("id", 0) or 0)
+                        save_empresa(payload, existing_id or None)
+                        st.session_state["empresa_save_notice"] = "✅ Cliente salvo com sucesso"
+                        st.toast("✅ Cliente salvo com sucesso")
+                        reset_empresa_cadastro_on_state()
+                        st.session_state["page"] = "Empresas"
+                        st.query_params["page"] = "Empresas"
+                        st.rerun()
+
+
 def render_empresas() -> None:
     st.markdown("**Empresas**")
 
@@ -3687,8 +3869,8 @@ def render_empresas() -> None:
         st.session_state["empresas_view_mode"] = "ativas"
     if "show_import_uploader" not in st.session_state:
         st.session_state["show_import_uploader"] = False
-    if "empresa_cadastro_on_open" not in st.session_state:
-        st.session_state["empresa_cadastro_on_open"] = False
+    if "show_cadastro_on" not in st.session_state:
+        st.session_state["show_cadastro_on"] = False
     if "empresa_cadastro_on_mode" not in st.session_state:
         st.session_state["empresa_cadastro_on_mode"] = "lookup"
     if "empresa_cadastro_on_result" not in st.session_state:
@@ -3730,7 +3912,7 @@ def render_empresas() -> None:
         export_df = display_df if not display_df.empty else filtered
 
         if c3.button(BUTTON_LABELS["incluir_cnpj"], key="btn_empresas_incluir_cnpj", type="primary", use_container_width=True):
-            st.session_state["empresa_cadastro_on_open"] = True
+            st.session_state["show_cadastro_on"] = True
             st.session_state["empresa_cadastro_on_mode"] = "lookup"
             st.session_state["empresa_cadastro_on_error"] = ""
             st.rerun()
@@ -4170,7 +4352,7 @@ def main() -> None:
         render_setup()
         return
 
-    requested_page = str(st.query_params.get("page", "Modulos"))
+    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Modulos")) or "Modulos")
     if requested_page == "usuarios" and not can_access_users_page():
         st.warning("Você não tem permissão para acessar esta área.")
         st.query_params["page"] = "Modulos"
@@ -4191,7 +4373,7 @@ def main() -> None:
         render_demandas(competencia)
     elif page == "Automacao":
         render_automacao()
-    elif page == "Faturamento MEI":
+    elif page in ("Faturamento", "Faturamento MEI"):
         render_faturamento(competencia)
     elif page == "Backup":
         render_backup()
