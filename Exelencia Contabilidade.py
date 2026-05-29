@@ -421,6 +421,26 @@ def apply_nexus_theme() -> None:
             border-radius: 12px;
             box-shadow: 0 10px 24px rgba(15,23,42,.06);
         }
+        .global-menu-panel {
+            padding: 6px 4px 2px 4px;
+        }
+        .global-menu-panel .stButton > button {
+            width: auto !important;
+            min-width: 154px !important;
+            max-width: 190px !important;
+            min-height: 46px !important;
+            padding: 0.45rem 0.75rem !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            justify-content: center !important;
+            text-align: center !important;
+            border-radius: 12px !important;
+        }
+        .global-menu-panel .stButton > button p {
+            width: 100%;
+            text-align: center !important;
+        }
         .login-brand {
             display: inline-flex;
             align-items: center;
@@ -781,12 +801,17 @@ def render_topbar() -> None:
 
     if st.session_state.get("global_menu_open", False):
         with st.container(border=True):
-            st.caption("Navegacao global")
-            for label, page in NAV_MENU.items():
-                button_type = "primary" if st.session_state.get("page") == page else "secondary"
-                if st.button(label, key=f"global_menu_{page}", use_container_width=True, type=button_type):
-                    st.session_state["global_menu_open"] = False
-                    navigate_to_page(page, label)
+            st.caption(f"Navegacao global - pagina atual: {st.session_state.get('page_label', '📂 Módulos')}")
+            items = list(NAV_MENU.items())
+            for start in range(0, len(items), 4):
+                row = items[start:start + 4]
+                row_cols = st.columns(len(row))
+                for idx, (label, page) in enumerate(row):
+                    button_type = "primary" if st.session_state.get("page") == page else "secondary"
+                    with row_cols[idx]:
+                        if st.button(label, key=f"global_menu_{page}", type=button_type):
+                            st.session_state["global_menu_open"] = False
+                            navigate_to_page(page, label)
 
 
 def navigate_to_page(page: str, page_label: str | None = None) -> None:
