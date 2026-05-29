@@ -1474,10 +1474,15 @@ def _restore_persistent_auth_session() -> bool:
     nome = user_row.get("nome", username) if user_row else username
     set_authenticated_session(username, role, nome)
     update_user_last_login(username)
-    st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
-    st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+    requested_page = str(st.query_params.get("page", AUTH_SESSION_DEFAULT_PAGE) or AUTH_SESSION_DEFAULT_PAGE)
+    valid_pages = set(NAV_MENU.values()) | {"usuarios"}
+    if requested_page not in valid_pages:
+        requested_page = AUTH_SESSION_DEFAULT_PAGE
+    requested_label = next((label for label, page in NAV_MENU.items() if page == requested_page), AUTH_SESSION_DEFAULT_LABEL)
+    st.session_state["page"] = requested_page
+    st.session_state["page_label"] = requested_label
     try:
-        st.query_params["page"] = AUTH_SESSION_DEFAULT_PAGE
+        st.query_params["page"] = requested_page
     except Exception:
         pass
     return True
@@ -3364,9 +3369,8 @@ def render_modulos() -> None:
                 if enabled:
                     if st.button("Acessar modulo >", key=f"access_module_{safe_key}"):
                         target = str(item["page"])
-                        st.session_state["page"] = target
-                        st.query_params["page"] = target
-                        st.rerun()
+                        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == target), target)
+                        navigate_to_page(target, label)
                 else:
                     st.button("Disponivel em breve", key=f"disabled_module_{safe_key}", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
