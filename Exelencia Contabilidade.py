@@ -4,17 +4,28 @@ from __future__ import annotations
 import io
 import json
 import os
+import hashlib
+import hmac
+import secrets
 import shutil
 import sqlite3
 import uuid
 import zipfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 import tomllib
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from sqlalchemy import create_engine, text
+
+try:
+    import extra_streamlit_components as esc
+except Exception:  # pragma: no cover - optional dependency for cookie persistence
+    esc = None
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -22,7 +33,28 @@ DATA_DIR = APP_DIR / "data"
 DEFAULT_DB_PATH = DATA_DIR / "cnpjs.db"
 DB_PATH = Path(os.getenv("CONTROLE_EMPRESAS_DB", str(DEFAULT_DB_PATH))).expanduser()
 AUTH_EXPORT_PATH = APP_DIR / "usuarios_senhas.txt"
+LOGO_PATH = APP_DIR / "logo.png"
+AUTH_SESSION_TTL_SECONDS = 3600
+AUTH_COOKIE_NAME = "ce_auth_token"
+AUTH_SESSION_DEFAULT_PAGE = "Modulos"
+AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
 _ENGINE = None
+
+USER_ROLES = {
+    "admin_geral": "Administrador Geral",
+    "contador": "Contador",
+    "estagiario": "Estagiário",
+    "usuario": "Usuário",
+}
+
+SPECIAL_USER_ROLES = {
+    "DMLIMA": "admin_geral",
+    "RAFAEL": "contador",
+}
+
+USER_MANAGEMENT_ALLOWED = {"DMLIMA", "RAFAEL"}
+PASSWORD_MIN_LENGTH = 6
+PBKDF2_ITERATIONS = 200_000
 
 DEMAND_TYPES = [
     ("EXEC_FOLHA", "Execucao da Folha de Pagamento"),
@@ -103,6 +135,39 @@ MODULES = [
     },
 ]
 
+NAV_MENU = {
+    "📂 Módulos": "Modulos",
+    "📊 Painel": "Painel",
+    "👤 Novo Cliente": "Novo Cliente",
+    "🏢 Empresas": "Empresas",
+    "📋 Demandas": "Demandas",
+    "🤖 Automação": "Automacao",
+    "💰 Faturamento": "Faturamento MEI",
+    "💾 Backup": "Backup",
+}
+
+BUTTON_LABELS = {
+    "ativas": "✅ Ativas",
+    "excluidas": "🗑️ Excluídas",
+    "importar": "📥 Importar",
+    "exportar": "📤 Exportar",
+    "incluir_cnpj": "➕ Incluir por CNPJ",
+    "cadastro_on": "🔎 Cadastro On",
+    "salvar": "💾 Salvar",
+    "cancelar": "❌ Cancelar",
+    "editar": "✏️ Editar",
+    "excluir": "🗑️ Excluir",
+    "atualizar": "🔄 Atualizar",
+    "buscar": "🔎 Buscar",
+    "limpar": "🧹 Limpar",
+    "voltar": "⬅️ Voltar",
+    "usuarios": "👥 Usuários",
+    "backup": "💾 Backup",
+    "demandas": "📋 Demandas",
+    "faturamento": "💰 Faturamento",
+    "automacao": "🤖 Automação",
+}
+
 
 def apply_nexus_theme() -> None:
     st.markdown(
@@ -164,6 +229,19 @@ def apply_nexus_theme() -> None:
             width: 16rem !important;
             min-width: 16rem !important;
             max-width: 16rem !important;
+        }
+        section[data-testid="stSidebar"] img {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            object-fit: contain;
+            image-rendering: auto;
+        }
+        .logo-sidebar-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 8px 4px 14px 4px;
         }
         section[data-testid="stSidebar"] {
             background:
@@ -665,16 +743,723 @@ def apply_nexus_theme() -> None:
     )
 
 
+def render_company_logo(width: int = 180, location: str = "sidebar") -> None:
+    if LOGO_PATH.exists():
+        st.markdown('<div class="logo-sidebar-box">', unsafe_allow_html=True)
+        st.image(str(LOGO_PATH), width=width)
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div class="logo-sidebar-box"><div style="text-align:center; font-weight:800; letter-spacing:0.04em;">EXCELENCIA CONTABILIDADE</div></div>',
+            unsafe_allow_html=True,
+        )
+
+
 def render_topbar() -> None:
-    st.markdown(
+    if "global_menu_open" not in st.session_state:
+        st.session_state["global_menu_open"] = False
+
+    cols = st.columns([6.8, 1.1, 1.2], vertical_alignment="center")
+    cols[0].markdown(
         """
         <div class="nexus-topbar">
             <div class="nexus-brand">EXCELENCIA <span>CONTABILIDADE</span></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    cols[1].markdown(
+        """
+        <div class="nexus-topbar nexus-topbar-link">
             <a class="nexus-local-link" href="http://localhost:8501/" target="_blank">Local</a>
         </div>
         """,
         unsafe_allow_html=True,
     )
+    if cols[2].button("\u2630 Menu", key="global_menu_toggle", use_container_width=True):
+        st.session_state["global_menu_open"] = not st.session_state.get("global_menu_open", False)
+
+    if st.session_state.get("global_menu_open", False):
+        with st.container(border=True):
+            st.caption("Navegacao global")
+            for label, page in NAV_MENU.items():
+                button_type = "primary" if st.session_state.get("page") == page else "secondary"
+                if st.button(label, key=f"global_menu_{page}", use_container_width=True, type=button_type):
+                    st.session_state["global_menu_open"] = False
+                    navigate_to_page(page, label)
+
+
+def navigate_to_page(page: str, page_label: str | None = None) -> None:
+    if page_label is None:
+        page_label = next((label for label, value in NAV_MENU.items() if value == page), page)
+    st.session_state["page"] = page
+    st.session_state["page_label"] = page_label
+    st.query_params["page"] = page
+    st.rerun()
+
+
+def normalize_username(value: str) -> str:
+    return str(value or "").strip().upper()
+
+
+def current_username() -> str:
+    return normalize_username(
+        st.session_state.get("username")
+        or st.session_state.get("auth_user")
+        or st.session_state.get("user")
+        or ""
+    )
+
+
+def current_user_role() -> str:
+    return str(st.session_state.get("user_role") or "").strip() or "usuario"
+
+
+def current_user_display_name() -> str:
+    value = str(st.session_state.get("user_name") or "").strip()
+    return value or current_username() or "sistema"
+
+
+def user_role_label(role: str) -> str:
+    return USER_ROLES.get(str(role or "").strip(), str(role or "").strip() or "Usuário")
+
+
+def is_admin_geral() -> bool:
+    return current_username() == "DMLIMA" or current_user_role() == "admin_geral"
+
+
+def is_contador() -> bool:
+    return current_username() == "RAFAEL" or current_user_role() in {"contador", "admin_geral"}
+
+
+def can_manage_users() -> bool:
+    return current_username() in USER_MANAGEMENT_ALLOWED or is_admin_geral()
+
+
+def can_access_users_page() -> bool:
+    return can_manage_users()
+
+
+def can_manage_user(target_user) -> bool:
+    if is_admin_geral():
+        return True
+    if not is_contador():
+        return False
+    target = target_user
+    if isinstance(target_user, pd.Series):
+        target = target_user.to_dict()
+    if isinstance(target, dict):
+        target_username = normalize_username(target.get("username"))
+        target_role = str(target.get("role") or "usuario").strip() or "usuario"
+        responsavel = normalize_username(target.get("responsavel"))
+        criado_por = normalize_username(target.get("criado_por"))
+    else:
+        target_username = normalize_username(target)
+        target_role = "usuario"
+        responsavel = ""
+        criado_por = ""
+    if target_username in {"DMLIMA"}:
+        return False
+    if target_role in {"admin_geral", "contador"} and target_username != "RAFAEL":
+        return False
+    if target_username == "RAFAEL":
+        return True
+    return current_username() in {responsavel, criado_por}
+
+
+def hash_password(password: str) -> str:
+    raw_password = str(password or "")
+    salt = os.urandom(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        raw_password.encode("utf-8"),
+        salt,
+        PBKDF2_ITERATIONS,
+    )
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, senha_hash: str) -> bool:
+    raw_hash = str(senha_hash or "").strip()
+    if not raw_hash or "$" not in raw_hash:
+        return False
+    try:
+        algorithm, iterations, salt_hex, digest_hex = raw_hash.split("$", 3)
+        if algorithm != "pbkdf2_sha256":
+            return False
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(digest_hex)
+        candidate = hashlib.pbkdf2_hmac(
+            "sha256",
+            str(password or "").encode("utf-8"),
+            salt,
+            int(iterations),
+        )
+        return hmac.compare_digest(candidate, expected)
+    except Exception:
+        return False
+
+
+def load_legacy_auth_users() -> dict[str, str]:
+    users: dict[str, str] = {}
+    if AUTH_EXPORT_PATH.exists():
+        try:
+            data = tomllib.loads(AUTH_EXPORT_PATH.read_text(encoding="utf-8"))
+            raw_users = data.get("auth", {}).get("users", {})
+            users.update({normalize_username(k): str(v) for k, v in dict(raw_users).items()})
+        except Exception:
+            pass
+    try:
+        secrets_auth = st.secrets.get("auth", {})
+        raw_users = secrets_auth.get("users", {}) if hasattr(secrets_auth, "get") else {}
+        users.update({normalize_username(k): str(v) for k, v in dict(raw_users).items()})
+    except Exception:
+        pass
+    env_user = normalize_username(os.getenv("CONTROLE_EMPRESAS_USER"))
+    env_password = os.getenv("CONTROLE_EMPRESAS_PASSWORD")
+    if env_user and env_password:
+        users[env_user] = str(env_password)
+    return users
+
+
+def configured_users() -> dict[str, str]:
+    return load_legacy_auth_users()
+
+
+def user_role_for(username: str, default_role: str = "usuario") -> str:
+    username_norm = normalize_username(username)
+    if username_norm in SPECIAL_USER_ROLES:
+        return SPECIAL_USER_ROLES[username_norm]
+    role = str(default_role or "usuario").strip()
+    return role if role in USER_ROLES else "usuario"
+
+
+def user_display_name_for(username: str, stored_name: str = "") -> str:
+    name = str(stored_name or "").strip()
+    return name or normalize_username(username) or "Usuário"
+
+
+def get_user_row(username: str):
+    username_norm = normalize_username(username)
+    if not username_norm:
+        return None
+    df = query_df("SELECT * FROM users WHERE UPPER(username)=UPPER(?) LIMIT 1", (username_norm,))
+    if df.empty:
+        return None
+    return df.iloc[0].to_dict()
+
+
+def get_users_df() -> pd.DataFrame:
+    return query_df(
+        """
+        SELECT id, username, COALESCE(nome,'') AS nome, COALESCE(role,'usuario') AS role,
+               COALESCE(ativo,1) AS ativo, COALESCE(responsavel,'') AS responsavel,
+               COALESCE(criado_por,'') AS criado_por, COALESCE(criado_em,'') AS criado_em,
+               COALESCE(atualizado_em,'') AS atualizado_em, COALESCE(ultimo_login,'') AS ultimo_login,
+               COALESCE(observacao,'') AS observacao
+          FROM users
+         ORDER BY username COLLATE NOCASE
+        """
+    )
+
+
+def get_visible_users_df() -> pd.DataFrame:
+    df = get_users_df()
+    if df.empty:
+        return df
+    if is_admin_geral():
+        return df
+    if current_username() == "RAFAEL":
+        mask = (
+            df["username"].astype(str).str.upper().eq("RAFAEL")
+            | df["responsavel"].astype(str).str.upper().eq("RAFAEL")
+            | df["criado_por"].astype(str).str.upper().eq("RAFAEL")
+        )
+        return df.loc[mask].copy()
+    return df.iloc[0:0].copy()
+
+
+def active_admin_count() -> int:
+    df = query_df(
+        """
+        SELECT COUNT(*) AS total
+          FROM users
+         WHERE COALESCE(ativo,1)=1
+           AND COALESCE(role,'usuario')='admin_geral'
+        """
+    )
+    if df.empty:
+        return 0
+    return int(df.iloc[0]["total"] or 0)
+
+
+def can_disable_user_record(target: dict) -> bool:
+    username_norm = normalize_username(target.get("username"))
+    role = str(target.get("role") or "usuario")
+    ativo = int(target.get("ativo") or 0)
+    if ativo == 0:
+        return True
+    if username_norm == "DMLIMA" and active_admin_count() <= 1:
+        return False
+    if role == "admin_geral" and active_admin_count() <= 1:
+        return False
+    return True
+
+
+def upsert_user_record(
+    *,
+    username: str,
+    nome: str,
+    senha_hash: str,
+    role: str,
+    ativo: int = 1,
+    criado_por: str = "",
+    responsavel: str = "",
+    observacao: str = "",
+    criado_em: str | None = None,
+    atualizado_em: str | None = None,
+    ultimo_login: str | None = None,
+) -> None:
+    username_norm = normalize_username(username)
+    role_norm = user_role_for(username_norm, role)
+    responsavel_norm = normalize_username(responsavel) or username_norm
+    criado_por_norm = normalize_username(criado_por)
+    timestamp = now_str()
+    created_at = criado_em or timestamp
+    updated_at = atualizado_em or timestamp
+    execute(
+        """
+        INSERT INTO users (username, nome, senha_hash, role, ativo, criado_por, responsavel, observacao, criado_em, atualizado_em, ultimo_login)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(username) DO UPDATE SET
+            nome=excluded.nome,
+            senha_hash=COALESCE(NULLIF(excluded.senha_hash,''), users.senha_hash),
+            role=excluded.role,
+            ativo=excluded.ativo,
+            criado_por=COALESCE(NULLIF(excluded.criado_por,''), users.criado_por),
+            responsavel=COALESCE(NULLIF(excluded.responsavel,''), users.responsavel),
+            observacao=excluded.observacao,
+            criado_em=COALESCE(users.criado_em, excluded.criado_em),
+            atualizado_em=excluded.atualizado_em,
+            ultimo_login=COALESCE(NULLIF(excluded.ultimo_login,''), users.ultimo_login)
+        """,
+        (
+            username_norm,
+            str(nome or "").strip() or username_norm,
+            str(senha_hash or "").strip(),
+            role_norm,
+            int(1 if ativo else 0),
+            criado_por_norm,
+            responsavel_norm,
+            str(observacao or "").strip(),
+            created_at,
+            updated_at,
+            str(ultimo_login or "").strip(),
+        ),
+    )
+
+
+def ensure_user_schema() -> None:
+    if using_postgres():
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                nome TEXT,
+                senha_hash TEXT NOT NULL DEFAULT '',
+                role TEXT NOT NULL DEFAULT 'usuario',
+                ativo INTEGER DEFAULT 1,
+                criado_em TEXT,
+                atualizado_em TEXT,
+                criado_por TEXT,
+                responsavel TEXT,
+                observacao TEXT,
+                ultimo_login TEXT
+            )
+            """
+        )
+    else:
+        with get_sqlite_conn() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    nome TEXT,
+                    senha_hash TEXT NOT NULL DEFAULT '',
+                    role TEXT NOT NULL DEFAULT 'usuario',
+                    ativo INTEGER DEFAULT 1,
+                    criado_em TEXT,
+                    atualizado_em TEXT,
+                    criado_por TEXT,
+                    responsavel TEXT,
+                    observacao TEXT,
+                    ultimo_login TEXT
+                )
+                """
+            )
+    ensure_column("users", "nome", "TEXT")
+    ensure_column("users", "senha_hash", "TEXT", "''")
+    ensure_column("users", "role", "TEXT", "'usuario'")
+    ensure_column("users", "ativo", "INTEGER", "1")
+    ensure_column("users", "criado_em", "TEXT")
+    ensure_column("users", "atualizado_em", "TEXT")
+    ensure_column("users", "criado_por", "TEXT")
+    ensure_column("users", "responsavel", "TEXT")
+    ensure_column("users", "observacao", "TEXT")
+    ensure_column("users", "ultimo_login", "TEXT")
+
+
+def seed_default_users() -> None:
+    legacy_users = load_legacy_auth_users()
+    defaults = [
+        ("DMLIMA", "admin_geral"),
+        ("RAFAEL", "contador"),
+    ]
+    for username, role in defaults:
+        existing = get_user_row(username)
+        legacy_password = legacy_users.get(username, "")
+        senha_hash = existing.get("senha_hash", "") if existing else ""
+        if legacy_password and not senha_hash:
+            senha_hash = hash_password(legacy_password)
+        if existing:
+            execute(
+                """
+                UPDATE users
+                   SET nome=COALESCE(NULLIF(nome,''), ?),
+                       senha_hash=COALESCE(NULLIF(?,''), senha_hash),
+                       role=?,
+                       ativo=1,
+                       responsavel=?,
+                       atualizado_em=?,
+                       criado_por=COALESCE(NULLIF(criado_por,''), ?)
+                 WHERE UPPER(username)=UPPER(?)
+                """,
+                (
+                    username,
+                    senha_hash,
+                    role,
+                    username,
+                    now_str(),
+                    username,
+                    username,
+                ),
+            )
+        else:
+            upsert_user_record(
+                username=username,
+                nome=username,
+                senha_hash=senha_hash,
+                role=role,
+                ativo=1,
+                criado_por=username,
+                responsavel=username,
+                observacao="Usuário padrão do sistema.",
+            )
+
+
+def update_user_last_login(username: str) -> None:
+    timestamp = now_str()
+    execute(
+        "UPDATE users SET ultimo_login=?, atualizado_em=? WHERE UPPER(username)=UPPER(?)",
+        (timestamp, timestamp, normalize_username(username)),
+    )
+
+
+def set_authenticated_session(username: str, role: str, nome: str) -> None:
+    username_norm = normalize_username(username)
+    role_norm = user_role_for(username_norm, role)
+    nome_final = user_display_name_for(username_norm, nome)
+    st.session_state["authenticated"] = True
+    st.session_state["is_authenticated"] = True
+    st.session_state["auth_user"] = username_norm
+    st.session_state["user"] = username_norm
+    st.session_state["username"] = username_norm
+    st.session_state["user_role"] = role_norm
+    st.session_state["user_name"] = nome_final
+
+
+def clear_authenticated_session_state() -> None:
+    for key in [
+        "authenticated",
+        "is_authenticated",
+        "auth_user",
+        "user",
+        "username",
+        "user_role",
+        "user_name",
+        "page",
+        "page_label",
+        "session_id",
+    ]:
+        st.session_state.pop(key, None)
+
+
+def _auth_cookie_manager():
+    if esc is None:
+        return None
+    try:
+        return esc.CookieManager(key="auth_cookie_mgr")
+    except Exception:
+        return None
+
+
+def hash_auth_token(token: str) -> str:
+    return hashlib.sha256(str(token).encode("utf-8")).hexdigest()
+
+
+def _auth_now() -> datetime:
+    return datetime.now()
+
+
+def _auth_now_str() -> str:
+    return _auth_now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _auth_expiry_str() -> str:
+    return (_auth_now() + timedelta(seconds=AUTH_SESSION_TTL_SECONDS)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _auth_cookie_secure_flag() -> bool:
+    try:
+        headers = getattr(st.context, "headers", None)
+        proto = ""
+        if headers is not None:
+            proto = str(headers.get("X-Forwarded-Proto", "") or headers.get("x-forwarded-proto", "") or "")
+        return proto.lower() == "https"
+    except Exception:
+        return False
+
+
+def _request_header_value(*names: str) -> str:
+    try:
+        headers = getattr(st.context, "headers", None)
+        if headers is None:
+            return ""
+        for name in names:
+            value = headers.get(name)
+            if value:
+                return str(value)
+    except Exception:
+        pass
+    return ""
+
+
+def ensure_auth_sessions_table() -> None:
+    if using_postgres():
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                last_seen TEXT,
+                revoked INTEGER DEFAULT 0,
+                user_agent TEXT,
+                ip_hint TEXT
+            )
+            """
+        )
+    else:
+        with get_sqlite_conn() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS auth_sessions (
+                    token_hash TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    last_seen TEXT,
+                    revoked INTEGER DEFAULT 0,
+                    user_agent TEXT,
+                    ip_hint TEXT
+                )
+                """
+            )
+
+
+def cleanup_expired_auth_sessions() -> None:
+    ensure_auth_sessions_table()
+    now_txt = _auth_now_str()
+    execute(
+        """
+        DELETE FROM auth_sessions
+         WHERE revoked=1 OR expires_at < ?
+        """,
+        (now_txt,),
+    )
+
+
+def create_auth_session(username: str) -> str:
+    ensure_auth_sessions_table()
+    cleanup_expired_auth_sessions()
+    token = secrets.token_urlsafe(32)
+    token_hash = hash_auth_token(token)
+    username_norm = normalize_username(username)
+    created_at = _auth_now_str()
+    expires_at = _auth_expiry_str()
+    user_agent = _request_header_value("User-Agent", "user-agent")
+    ip_hint = _request_header_value("X-Forwarded-For", "x-forwarded-for", "X-Real-Ip", "x-real-ip")
+    execute(
+        """
+        INSERT INTO auth_sessions (
+            token_hash, username, created_at, expires_at, last_seen, revoked, user_agent, ip_hint
+        )
+        VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+        """,
+        (token_hash, username_norm, created_at, expires_at, created_at, user_agent, ip_hint),
+    )
+    return token
+
+
+def validate_auth_session(token: str) -> str | None:
+    if not token:
+        return None
+    ensure_auth_sessions_table()
+    cleanup_expired_auth_sessions()
+    token_hash = hash_auth_token(token)
+    df = query_df(
+        """
+        SELECT username, expires_at, revoked
+          FROM auth_sessions
+         WHERE token_hash=?
+         LIMIT 1
+        """,
+        (token_hash,),
+    )
+    if df.empty:
+        return None
+    row = df.iloc[0]
+    if int(row.get("revoked", 0) or 0) == 1:
+        return None
+    expires_at = str(row.get("expires_at") or "").strip()
+    if not expires_at or expires_at < _auth_now_str():
+        execute("UPDATE auth_sessions SET revoked=1 WHERE token_hash=?", (token_hash,))
+        return None
+    username = normalize_username(row.get("username", ""))
+    execute(
+        "UPDATE auth_sessions SET last_seen=? WHERE token_hash=?",
+        (_auth_now_str(), token_hash),
+    )
+    return username or None
+
+
+def revoke_auth_session(token: str) -> None:
+    if not token:
+        return
+    ensure_auth_sessions_table()
+    execute(
+        "UPDATE auth_sessions SET revoked=1, last_seen=? WHERE token_hash=?",
+        (_auth_now_str(), hash_auth_token(token)),
+    )
+
+
+def _get_auth_token_from_cookie() -> str:
+    manager = _auth_cookie_manager()
+    if manager is None:
+        return ""
+    try:
+        value = manager.get(AUTH_COOKIE_NAME)
+        return str(value or "").strip()
+    except Exception:
+        return ""
+
+
+def _get_auth_token_from_query() -> str:
+    try:
+        return str(st.query_params.get("auth_token", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def _set_auth_token_cookie(token: str) -> None:
+    manager = _auth_cookie_manager()
+    if manager is None:
+        return
+    try:
+        manager.set(
+            AUTH_COOKIE_NAME,
+            token,
+            max_age=AUTH_SESSION_TTL_SECONDS,
+            secure=_auth_cookie_secure_flag(),
+            same_site="lax",
+        )
+    except Exception:
+        pass
+
+
+def _delete_auth_token_cookie() -> None:
+    manager = _auth_cookie_manager()
+    if manager is None:
+        return
+    try:
+        manager.delete(AUTH_COOKIE_NAME)
+    except Exception:
+        pass
+
+
+def _delete_query_param_auth_token() -> None:
+    try:
+        if "auth_token" in st.query_params:
+            del st.query_params["auth_token"]
+    except Exception:
+        pass
+
+
+def _set_auth_persistence(token: str) -> None:
+    _set_auth_token_cookie(token)
+    try:
+        st.query_params["auth_token"] = token
+    except Exception:
+        pass
+
+
+def _restore_persistent_auth_session() -> bool:
+    ensure_auth_sessions_table()
+    token = _get_auth_token_from_cookie() or _get_auth_token_from_query()
+    if not token:
+        return False
+    username = validate_auth_session(token)
+    if not username:
+        _delete_auth_token_cookie()
+        _delete_query_param_auth_token()
+        return False
+    user_row = get_user_row(username)
+    legacy_users = configured_users()
+    if not user_row and username not in legacy_users:
+        revoke_auth_session(token)
+        _delete_auth_token_cookie()
+        _delete_query_param_auth_token()
+        clear_authenticated_session_state()
+        return False
+    if user_row and int(user_row.get("ativo", 1) or 0) == 0:
+        revoke_auth_session(token)
+        _delete_auth_token_cookie()
+        _delete_query_param_auth_token()
+        clear_authenticated_session_state()
+        return False
+    role = user_row.get("role", "usuario") if user_row else "usuario"
+    nome = user_row.get("nome", username) if user_row else username
+    set_authenticated_session(username, role, nome)
+    update_user_last_login(username)
+    st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
+    st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+    try:
+        st.query_params["page"] = AUTH_SESSION_DEFAULT_PAGE
+    except Exception:
+        pass
+    return True
+
+
+def _logout_authenticated_session() -> None:
+    token = _get_auth_token_from_cookie() or _get_auth_token_from_query()
+    if token:
+        revoke_auth_session(token)
+    _delete_auth_token_cookie()
+    _delete_query_param_auth_token()
+    clear_authenticated_session_state()
 
 
 def now_str() -> str:
@@ -714,13 +1499,13 @@ def cleanup_active_sessions(minutes: int = 10) -> None:
 
 
 def touch_active_session(page: str = "") -> None:
-    if not st.session_state.get("authenticated"):
+    if not st.session_state.get("authenticated") and not st.session_state.get("is_authenticated"):
         return
     session_id = str(st.session_state.get("session_id") or "").strip()
     if not session_id:
         session_id = uuid.uuid4().hex
         st.session_state["session_id"] = session_id
-    usuario = str(st.session_state.get("auth_user", "")).strip() or "sistema"
+    usuario = current_username() or "sistema"
     timestamp = now_str()
     execute(
         """
@@ -737,7 +1522,7 @@ def touch_active_session(page: str = "") -> None:
 
 
 def current_user() -> str:
-    return str(st.session_state.get("auth_user", "")).strip() or "sistema"
+    return current_username() or "sistema"
 
 
 def remove_active_session() -> None:
@@ -875,7 +1660,15 @@ def init_db() -> None:
                 nome_fantasia TEXT,
                 apelido TEXT,
                 regime TEXT,
+                abertura TEXT,
+                situacao TEXT,
+                porte TEXT,
+                natureza_juridica TEXT,
+                capital_social TEXT,
+                simples_optante INTEGER DEFAULT 0,
+                mei_optante INTEGER DEFAULT 0,
                 is_ativo INTEGER DEFAULT 1,
+                inativo INTEGER DEFAULT 0,
                 criado_em TEXT,
                 atualizado_em TEXT
             )
@@ -945,6 +1738,20 @@ def init_db() -> None:
             )
             """
         )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                last_seen TEXT,
+                revoked INTEGER DEFAULT 0,
+                user_agent TEXT,
+                ip_hint TEXT
+            )
+            """
+        )
     else:
         with get_sqlite_conn() as conn:
             conn.execute(
@@ -956,7 +1763,15 @@ def init_db() -> None:
                 nome_fantasia TEXT,
                 apelido TEXT,
                 regime TEXT,
+                abertura TEXT,
+                situacao TEXT,
+                porte TEXT,
+                natureza_juridica TEXT,
+                capital_social TEXT,
+                simples_optante INTEGER DEFAULT 0,
+                mei_optante INTEGER DEFAULT 0,
                 is_ativo INTEGER DEFAULT 1,
+                inativo INTEGER DEFAULT 0,
                 criado_em TEXT,
                 atualizado_em TEXT
             )
@@ -1029,15 +1844,38 @@ def init_db() -> None:
             )
             """
             )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                last_seen TEXT,
+                revoked INTEGER DEFAULT 0,
+                user_agent TEXT,
+                ip_hint TEXT
+            )
+            """
+            )
     ensure_column("empresas", "mensalidade", "TEXT")
     ensure_column("empresas", "cidade", "TEXT")
     ensure_column("empresas", "uf", "TEXT")
+    ensure_column("empresas", "abertura", "TEXT")
+    ensure_column("empresas", "situacao", "TEXT")
+    ensure_column("empresas", "porte", "TEXT")
+    ensure_column("empresas", "natureza_juridica", "TEXT")
+    ensure_column("empresas", "capital_social", "TEXT")
+    ensure_column("empresas", "simples_optante", "INTEGER", "0")
+    ensure_column("empresas", "mei_optante", "INTEGER", "0")
     ensure_column("empresas", "inativo", "INTEGER", "0")
     ensure_column("empresas", "funcionarios", "INTEGER", "0")
     ensure_column("empresas", "prolabore", "INTEGER", "0")
     ensure_column("empresas", "prefeitura_optante", "INTEGER", "0")
     ensure_column("empresas", "fgts_parc", "INTEGER", "0")
     ensure_column("demandas", "observacao", "TEXT", "''")
+    ensure_user_schema()
+    seed_default_users()
 
 
 def demand_options() -> list[str]:
@@ -1057,13 +1895,15 @@ def show_table(
     column_config: dict | None = None,
     disabled: list[str] | bool = True,
     row_height: int = 30,
+    auto_height: bool = False,
+    max_height: int = 4000,
 ) -> pd.DataFrame:
+    if auto_height:
+        height = calc_empresas_table_height(len(df), row_height=row_height, max_height=max_height)
     return st.data_editor(
         df,
         key=key,
-        width="stretch",
         height=height,
-        row_height=row_height,
         use_container_width=True,
         hide_index=True,
         num_rows="fixed",
@@ -1072,11 +1912,379 @@ def show_table(
     )
 
 
+def calc_empresas_table_height(num_rows: int, *, row_height: int = 35, max_height: int = 4000) -> int:
+    header_height = 45
+    padding = 20
+    min_height = 650
+    calc_height = header_height + padding + (max(num_rows, 0) * row_height)
+    return max(min_height, min(calc_height, max_height))
+
+
+def _scroll_key(page_key: str) -> str:
+    return f"scroll_{page_key}_y"
+
+
+def inject_scroll_keeper(page_key: str) -> None:
+    storage_key = _scroll_key(page_key)
+    components.html(
+        f"""
+        <script>
+        (function() {{
+          const storageKey = {json.dumps(storage_key)};
+          try {{
+            const parentWindow = window.parent;
+            if (!parentWindow) return;
+            const doc = parentWindow.document;
+            const root = doc && doc.documentElement;
+            const body = doc && doc.body;
+            const saveScroll = function() {{
+              try {{
+                const y = Math.max(
+                  parentWindow.pageYOffset || 0,
+                  root ? root.scrollTop : 0,
+                  body ? body.scrollTop : 0
+                );
+                parentWindow.localStorage.setItem(storageKey, String(y));
+              }} catch (err) {{}}
+            }};
+            if (!parentWindow.__ceScrollKeeperBound) {{
+              parentWindow.__ceScrollKeeperBound = true;
+              parentWindow.addEventListener('scroll', saveScroll, {{ passive: true }});
+            }}
+            saveScroll();
+          }} catch (err) {{}}
+        }})();
+        </script>
+        """,
+        height=0,
+    )
+
+
+def mark_restore_scroll(page_key: str) -> None:
+    st.session_state[f"restore_scroll_{page_key}"] = True
+
+
+def restore_scroll_if_needed(page_key: str) -> None:
+    flag_key = f"restore_scroll_{page_key}"
+    if not st.session_state.pop(flag_key, False):
+        return
+    storage_key = _scroll_key(page_key)
+    components.html(
+        f"""
+        <script>
+        (function() {{
+          const storageKey = {json.dumps(storage_key)};
+          try {{
+            const parentWindow = window.parent;
+            if (!parentWindow) return;
+            const yRaw = parentWindow.localStorage.getItem(storageKey);
+            const y = Number.parseInt(yRaw || '0', 10);
+            if (!Number.isFinite(y)) return;
+            setTimeout(function() {{
+              try {{
+                parentWindow.scrollTo(0, y);
+                const doc = parentWindow.document;
+                if (doc && doc.documentElement) doc.documentElement.scrollTop = y;
+                if (doc && doc.body) doc.body.scrollTop = y;
+              }} catch (err) {{}}
+            }}, 60);
+          }} catch (err) {{}}
+        }})();
+        </script>
+        """,
+        height=0,
+    )
+
+
 def normalize_cnpj(value: str) -> str:
     digits = "".join(ch for ch in str(value or "") if ch.isdigit())
     if len(digits) != 14:
         return str(value or "").strip()
     return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
+
+
+def cnpj_digits(value: str) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def cnpj_biz_url(cnpj_txt: str) -> str:
+    cnpj = only_digits(cnpj_txt)
+    return f"https://cnpj.biz/{cnpj}" if len(cnpj) == 14 else "https://cnpj.biz/"
+
+
+def only_digits(value: str) -> str:
+    return cnpj_digits(value)
+
+
+def format_cnpj(value: str) -> str:
+    return normalize_cnpj(value)
+
+
+def cnpj_valido(value: str) -> bool:
+    return len(cnpj_digits(value)) == 14
+
+
+def _normalize_brl_text_for_db(value: str) -> str:
+    return format_brl_currency(value)
+
+
+def split_cidade_uf(value: str) -> tuple[str, str]:
+    txt = str(value or "").strip()
+    if not txt:
+        return "", ""
+    if " - " in txt:
+        city, uf = txt.rsplit(" - ", 1)
+        return city.strip(), uf.strip().upper()
+    if "/" in txt:
+        city, uf = txt.rsplit("/", 1)
+        uf = uf.strip().upper()
+        if len(uf) == 2:
+            return city.strip(), uf
+    return txt, ""
+
+
+def _first_filled(*values) -> str:
+    for value in values:
+        if value is None:
+            continue
+        txt = str(value).strip()
+        if txt and txt.lower() not in {"none", "null", "nan"}:
+            return txt
+    return ""
+
+
+def _date_br_to_iso(txt: str) -> str:
+    value = str(txt or "").strip()
+    if not value:
+        return ""
+    if len(value) == 10 and value[4] == "-" and value[7] == "-":
+        return value
+    parts = value.split("/")
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
+        dd, mm, yyyy = parts
+        if len(yyyy) == 4:
+            return f"{yyyy}-{mm.zfill(2)}-{dd.zfill(2)}"
+    return value
+
+
+def _fmt_natureza_juridica(nat_id, nat_desc) -> str:
+    desc = str(nat_desc or "").strip()
+    raw_id = "".join(ch for ch in str(nat_id or "") if ch.isdigit())
+    if raw_id:
+        if len(raw_id) >= 4:
+            raw_id = f"{raw_id[:-1]}-{raw_id[-1]}"
+        if desc:
+            return f"{raw_id} - {desc}"
+        return raw_id
+    return desc
+
+
+def _guess_apelido(razao: str, fantasia: str) -> str:
+    base = _first_filled(fantasia, razao)
+    base = str(base or "").strip()
+    while base and base[0].isdigit():
+        base = base[1:].lstrip(" -./")
+    return base.upper()[:28]
+
+
+def _regime_option(value: str) -> str:
+    txt = str(value or "").strip()
+    if txt in REGIMES:
+        return txt
+    if txt.upper().startswith("MEI"):
+        return "MEI"
+    if txt.upper().startswith("SIMPLES"):
+        return "Simples Nacional"
+    if txt.upper().startswith("LUCRO PRESUMIDO"):
+        return "Lucro Presumido"
+    if txt.upper().startswith("LUCRO REAL"):
+        return "Lucro Real"
+    return REGIMES[0]
+
+
+def _http_get_text(url: str, timeout: int = 20, accept_json: bool = False) -> str:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Accept": "application/json, text/plain, */*" if accept_json else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+    request = Request(url, headers=headers)
+    with urlopen(request, timeout=timeout) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _extract_simples_flags_from_cnpjws(payload: dict) -> tuple[int, int]:
+    simples = payload.get("simples") or {}
+    estabelecimento = payload.get("estabelecimento") or {}
+    regimes = estabelecimento.get("regimes_tributarios") or []
+    text_blob = " ".join(
+        str(item.get("regime_tributario") or item.get("forma_de_tributacao") or "")
+        for item in regimes
+        if isinstance(item, dict)
+    ).upper()
+
+    def truthy(v) -> bool:
+        if isinstance(v, bool):
+            return v
+        return str(v or "").strip().lower() in {"1", "true", "t", "s", "sim", "y", "yes"}
+
+    simples_optante = 0
+    mei_optante = 0
+    if isinstance(simples, dict):
+        simples_optante = 1 if truthy(simples.get("simples") or simples.get("simples_nacional") or simples.get("optante")) else 0
+        mei_optante = 1 if truthy(simples.get("mei") or simples.get("simei") or simples.get("simei")) else 0
+    if not simples_optante and "SIMPLES" in text_blob:
+        simples_optante = 1
+    if not mei_optante and ("MEI" in text_blob or "SIMEI" in text_blob):
+        mei_optante = 1
+    return simples_optante, mei_optante
+
+
+def _fetch_receitaws_json(cnpj: str) -> dict:
+    url = f"https://www.receitaws.com.br/v1/cnpj/{cnpj}"
+    text = _http_get_text(url, timeout=20, accept_json=True)
+    payload = json.loads(text)
+    if isinstance(payload, dict):
+        return payload
+    raise ValueError("Retorno invalido da ReceitaWS.")
+
+
+def fetch_empresa_cadastro_on(cnpj_txt: str) -> dict:
+    cnpj = only_digits(cnpj_txt)
+    if not cnpj_valido(cnpj):
+        raise ValueError("Informe um CNPJ v?lido com 14 d?gitos.")
+
+    url_biz = cnpj_biz_url(cnpj)
+    try:
+        _http_get_text(url_biz, timeout=20, accept_json=False)
+    except Exception:
+        pass
+
+    info = {
+        "source": "cnpj.biz",
+        "url": url_biz,
+        "cnpj": cnpj,
+        "razao_social": "",
+        "nome_fantasia": "",
+        "apelido": "",
+        "regime": "Lucro Presumido",
+        "abertura": "",
+        "natureza_juridica": "",
+        "situacao": "",
+        "capital_social": "",
+        "cidade": "",
+        "uf": "",
+        "porte": "",
+        "simples_optante": 0,
+        "mei_optante": 0,
+    }
+
+    cnpjws_payload: dict = {}
+    cnpjws_error = None
+    try:
+        cnpjws_text = _http_get_text(f"https://publica.cnpj.ws/cnpj/{cnpj}", timeout=20, accept_json=True)
+        cnpjws_payload = json.loads(cnpjws_text)
+        if not isinstance(cnpjws_payload, dict):
+            raise ValueError("JSON invalido da cnpj.ws.")
+    except Exception as exc:
+        cnpjws_error = exc
+        cnpjws_payload = {}
+
+    if cnpjws_payload:
+        estabelecimento = cnpjws_payload.get("estabelecimento") or {}
+        cidade = estabelecimento.get("cidade") or {}
+        estado = estabelecimento.get("estado") or {}
+        natureza = cnpjws_payload.get("natureza_juridica") or {}
+        porte = cnpjws_payload.get("porte") or {}
+        simples_optante, mei_optante = _extract_simples_flags_from_cnpjws(cnpjws_payload)
+
+        info["razao_social"] = _first_filled(cnpjws_payload.get("razao_social"), estabelecimento.get("razao_social"))
+        info["nome_fantasia"] = _first_filled(estabelecimento.get("nome_fantasia"))
+        info["cidade"] = _first_filled(cidade.get("nome"), estabelecimento.get("municipio"), estabelecimento.get("nome_cidade_exterior"))
+        info["uf"] = _first_filled(estado.get("sigla"), estabelecimento.get("uf")).upper()
+        info["abertura"] = _date_br_to_iso(_first_filled(estabelecimento.get("data_inicio_atividade")))
+        info["situacao"] = _first_filled(estabelecimento.get("situacao_cadastral"))
+        info["capital_social"] = _first_filled(cnpjws_payload.get("capital_social"))
+        info["porte"] = _first_filled(porte.get("descricao"))
+        info["natureza_juridica"] = _fmt_natureza_juridica(natureza.get("id"), natureza.get("descricao"))
+        info["simples_optante"] = simples_optante
+        info["mei_optante"] = mei_optante
+        info["regime"] = "MEI" if mei_optante else ("Simples Nacional (ME/EPP)" if simples_optante else "Lucro Presumido")
+        info["apelido"] = _guess_apelido(info["razao_social"], info["nome_fantasia"])
+        info["source"] = "cnpj.biz + cnpj.ws"
+    elif cnpjws_error is not None:
+        # If cnpj.ws is unavailable, fall back to ReceitaWS so the user can still proceed.
+        try:
+            receitaws_payload = _fetch_receitaws_json(cnpj)
+        except Exception as exc:
+            raise ConnectionError("A consulta online falhou. Tente novamente ou preencha manualmente.") from exc
+
+        info["source"] = "cnpj.biz + receitaws"
+        info["razao_social"] = _first_filled(receitaws_payload.get("nome"))
+        info["nome_fantasia"] = _first_filled(receitaws_payload.get("fantasia"))
+        info["apelido"] = _guess_apelido(info["razao_social"], info["nome_fantasia"])
+        info["abertura"] = _date_br_to_iso(_first_filled(receitaws_payload.get("abertura")))
+        info["situacao"] = _first_filled(receitaws_payload.get("situacao"))
+        info["capital_social"] = _first_filled(receitaws_payload.get("capital_social"))
+        info["cidade"] = _first_filled(receitaws_payload.get("municipio"))
+        info["uf"] = _first_filled(receitaws_payload.get("uf")).upper()
+        info["porte"] = _first_filled(receitaws_payload.get("porte"))
+        receitaws_nat = str(receitaws_payload.get("natureza_juridica") or "").strip()
+        if receitaws_nat:
+            if " - " in receitaws_nat:
+                nat_id, nat_desc = receitaws_nat.split(" - ", 1)
+            else:
+                nat_id, nat_desc = "", receitaws_nat
+            info["natureza_juridica"] = _fmt_natureza_juridica(nat_id, nat_desc)
+        simples_txt = str(receitaws_payload.get("simples", "") or "").upper()
+        simei_txt = str(receitaws_payload.get("simei", "") or "").upper()
+        if simples_txt in {"SIM", "S", "TRUE", "1"}:
+            info["simples_optante"] = 1
+        if simei_txt in {"SIM", "S", "TRUE", "1"}:
+            info["mei_optante"] = 1
+        info["regime"] = "MEI" if info["mei_optante"] else ("Simples Nacional (ME/EPP)" if info["simples_optante"] else "Lucro Presumido")
+        return info
+
+    missing_fields = [
+        field for field in ["razao_social", "nome_fantasia", "cidade", "uf", "abertura", "situacao", "capital_social", "porte", "natureza_juridica"]
+        if not str(info.get(field, "")).strip()
+    ]
+    if missing_fields:
+        try:
+            receitaws_payload = _fetch_receitaws_json(cnpj)
+        except Exception:
+            receitaws_payload = {}
+        if isinstance(receitaws_payload, dict) and receitaws_payload:
+            info["source"] = "cnpj.biz + cnpj.ws + receitaws"
+            info["razao_social"] = _first_filled(info["razao_social"], receitaws_payload.get("nome"))
+            info["nome_fantasia"] = _first_filled(info["nome_fantasia"], receitaws_payload.get("fantasia"))
+            info["abertura"] = _first_filled(info["abertura"], _date_br_to_iso(receitaws_payload.get("abertura")))
+            info["situacao"] = _first_filled(info["situacao"], receitaws_payload.get("situacao"))
+            info["capital_social"] = _first_filled(info["capital_social"], receitaws_payload.get("capital_social"))
+            info["cidade"] = _first_filled(info["cidade"], receitaws_payload.get("municipio"))
+            info["uf"] = _first_filled(info["uf"], receitaws_payload.get("uf")).upper()
+            info["porte"] = _first_filled(info["porte"], receitaws_payload.get("porte"))
+            receitaws_nat = str(receitaws_payload.get("natureza_juridica") or "").strip()
+            if receitaws_nat and not info["natureza_juridica"]:
+                if " - " in receitaws_nat:
+                    nat_id, nat_desc = receitaws_nat.split(" - ", 1)
+                else:
+                    nat_id, nat_desc = "", receitaws_nat
+                info["natureza_juridica"] = _fmt_natureza_juridica(nat_id, nat_desc)
+            simples_txt = str(receitaws_payload.get("simples", "") or "").upper()
+            simei_txt = str(receitaws_payload.get("simei", "") or "").upper()
+            if not info["simples_optante"] and simples_txt in {"SIM", "S", "TRUE", "1"}:
+                info["simples_optante"] = 1
+            if not info["mei_optante"] and simei_txt in {"SIM", "S", "TRUE", "1"}:
+                info["mei_optante"] = 1
+            info["regime"] = "MEI" if info["mei_optante"] else ("Simples Nacional (ME/EPP)" if info["simples_optante"] else info["regime"])
+            info["apelido"] = _guess_apelido(info["razao_social"], info["nome_fantasia"])
+
+    return info
+
+
+def fetch_empresa_cadastro_on_web(cnpj: str) -> dict:
+    return fetch_empresa_cadastro_on(cnpj)
 
 
 def clean_cell(value) -> str:
@@ -1102,16 +2310,68 @@ def load_empresas(active_only: bool = True) -> pd.DataFrame:
     )
 
 
+def format_brl_currency(val: str) -> str:
+    if not val:
+        return ""
+    clean = str(val).upper().replace("R$", "").replace("$", "").strip()
+    if not clean:
+        return ""
+    try:
+        num_chars = []
+        for char in clean:
+            if char.isdigit() or char in [".", ","]:
+                num_chars.append(char)
+        num_str = "".join(num_chars)
+        if not num_str:
+            return clean
+            
+        if "," in num_str:
+            parts = num_str.split(",")
+            integer_part = parts[0].replace(".", "")
+            decimal_part = parts[1]
+            val_float = float(f"{integer_part}.{decimal_part}")
+        else:
+            if "." in num_str:
+                dot_parts = num_str.split(".")
+                if len(dot_parts) == 2 and len(dot_parts[1]) != 3:
+                    val_float = float(num_str)
+                else:
+                    val_float = float(num_str.replace(".", ""))
+            else:
+                val_float = float(num_str)
+        
+        if val_float.is_integer():
+            formatted = f"{int(val_float):,}".replace(",", ".") + " R$"
+        else:
+            formatted = f"{val_float:,.2f}"
+            formatted = formatted.replace(",", "X").replace(".", ",").replace("X", ".") + " R$"
+        return formatted
+    except Exception:
+        s = str(val).strip()
+        if s and not s.upper().endswith("R$") and not s.upper().endswith("R $"):
+            return f"{s} R$"
+        return s
+
+
 def save_empresa(data: dict, empresa_id: int | None = None) -> None:
     timestamp = now_str()
     is_ativo = 0 if int(data.get("inativo", 0)) else 1
+    simples_optante = int(data.get("simples_optante", 0) or 0)
+    mei_optante = int(data.get("mei_optante", 0) or 0)
     normalized = {
         "cnpj": normalize_cnpj(data["cnpj"]),
         "razao_social": data["razao_social"].strip(),
         "nome_fantasia": data.get("nome_fantasia", "").strip(),
         "apelido": data.get("apelido", "").strip(),
         "regime": data.get("regime", "").strip(),
-        "mensalidade": data.get("mensalidade", "").strip(),
+        "abertura": data.get("abertura", "").strip(),
+        "situacao": data.get("situacao", "").strip(),
+        "porte": data.get("porte", "").strip(),
+        "natureza_juridica": data.get("natureza_juridica", "").strip(),
+        "capital_social": data.get("capital_social", "").strip(),
+        "simples_optante": simples_optante,
+        "mei_optante": mei_optante,
+        "mensalidade": format_brl_currency(data.get("mensalidade", "")),
         "cidade": data.get("cidade", "").strip(),
         "uf": data.get("uf", "").strip().upper(),
         "inativo": int(data.get("inativo", 0)),
@@ -1124,7 +2384,9 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
             """
             UPDATE empresas
                SET cnpj=?, razao_social=?, nome_fantasia=?, apelido=?, regime=?,
-                   mensalidade=?, cidade=?, uf=?, inativo=?, is_ativo=?, atualizado_em=?
+                   abertura=?, situacao=?, porte=?, natureza_juridica=?, capital_social=?,
+                   simples_optante=?, mei_optante=?, mensalidade=?, cidade=?, uf=?,
+                   inativo=?, is_ativo=?, atualizado_em=?
              WHERE id=?
             """,
             (
@@ -1133,6 +2395,13 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["nome_fantasia"],
                 normalized["apelido"],
                 normalized["regime"],
+                normalized["abertura"],
+                normalized["situacao"],
+                normalized["porte"],
+                normalized["natureza_juridica"],
+                normalized["capital_social"],
+                normalized["simples_optante"],
+                normalized["mei_optante"],
                 normalized["mensalidade"],
                 normalized["cidade"],
                 normalized["uf"],
@@ -1143,7 +2412,12 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
             ),
         )
         after = empresa_snapshot(empresa_row(int(empresa_id)))
-        if before and after and any(str(before.get(key, "")) != str(after.get(key, "")) for key in ["cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf", "inativo", "is_ativo"]):
+        if before and after and any(str(before.get(key, "")) != str(after.get(key, "")) for key in [
+            "cnpj", "razao_social", "nome_fantasia", "apelido", "regime",
+            "abertura", "situacao", "porte", "natureza_juridica", "capital_social",
+            "simples_optante", "mei_optante", "mensalidade", "cidade", "uf",
+            "inativo", "is_ativo",
+        ]):
             before_active = int(before.get("is_ativo", 1) or 1)
             after_active = int(after.get("is_ativo", 1) or 1)
             if before_active == 1 and after_active == 0:
@@ -1157,9 +2431,10 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
         execute(
             """
             INSERT INTO empresas
-                (cnpj, razao_social, nome_fantasia, apelido, regime, mensalidade,
-                 cidade, uf, inativo, is_ativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (cnpj, razao_social, nome_fantasia, apelido, regime, abertura, situacao,
+                 porte, natureza_juridica, capital_social, simples_optante, mei_optante,
+                 mensalidade, cidade, uf, inativo, is_ativo, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 normalized["cnpj"],
@@ -1167,6 +2442,13 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["nome_fantasia"],
                 normalized["apelido"],
                 normalized["regime"],
+                normalized["abertura"],
+                normalized["situacao"],
+                normalized["porte"],
+                normalized["natureza_juridica"],
+                normalized["capital_social"],
+                normalized["simples_optante"],
+                normalized["mei_optante"],
                 normalized["mensalidade"],
                 normalized["cidade"],
                 normalized["uf"],
@@ -1186,6 +2468,11 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
         """
         SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
+               COALESCE(abertura,'') AS abertura, COALESCE(situacao,'') AS situacao,
+               COALESCE(porte,'') AS porte, COALESCE(natureza_juridica,'') AS natureza_juridica,
+               COALESCE(capital_social,'') AS capital_social,
+               COALESCE(simples_optante,0) AS simples_optante,
+               COALESCE(mei_optante,0) AS mei_optante,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
@@ -1209,6 +2496,11 @@ def empresa_row(empresa_id: int) -> dict:
         """
         SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
+               COALESCE(abertura,'') AS abertura, COALESCE(situacao,'') AS situacao,
+               COALESCE(porte,'') AS porte, COALESCE(natureza_juridica,'') AS natureza_juridica,
+               COALESCE(capital_social,'') AS capital_social,
+               COALESCE(simples_optante,0) AS simples_optante,
+               COALESCE(mei_optante,0) AS mei_optante,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
@@ -1233,6 +2525,13 @@ def empresa_snapshot(row: dict | None) -> dict:
         "nome_fantasia": str(data.get("nome_fantasia", "") or ""),
         "apelido": str(data.get("apelido", "") or ""),
         "regime": str(data.get("regime", "") or ""),
+        "abertura": str(data.get("abertura", "") or ""),
+        "situacao": str(data.get("situacao", "") or ""),
+        "porte": str(data.get("porte", "") or ""),
+        "natureza_juridica": str(data.get("natureza_juridica", "") or ""),
+        "capital_social": str(data.get("capital_social", "") or ""),
+        "simples_optante": int(data.get("simples_optante", 0) or 0),
+        "mei_optante": int(data.get("mei_optante", 0) or 0),
         "mensalidade": str(data.get("mensalidade", "") or ""),
         "cidade": str(data.get("cidade", "") or ""),
         "uf": str(data.get("uf", "") or ""),
@@ -1443,25 +2742,7 @@ def render_setup() -> None:
 
 
 def sync_auth_passwords_txt(users: dict[str, str]) -> None:
-    lines = [
-        "# Arquivo gerado automaticamente pelo app.",
-        "# Nao versionar nem compartilhar.",
-        "[auth.users]",
-    ]
-    for user in sorted(users):
-        lines.append(f"{user} = {json.dumps(users[user], ensure_ascii=False)}")
-    if not users:
-        lines.append("# Nenhum usuario configurado.")
-
-    content = "\n".join(lines) + "\n"
-    try:
-        if AUTH_EXPORT_PATH.exists():
-            current = AUTH_EXPORT_PATH.read_text(encoding="utf-8")
-            if current == content:
-                return
-        AUTH_EXPORT_PATH.write_text(content, encoding="utf-8")
-    except Exception:
-        pass
+    return
 
 
 def load_auth_users_from_file() -> dict[str, str]:
@@ -1493,6 +2774,9 @@ def configured_users() -> dict[str, str]:
 
 
 def require_login() -> bool:
+    ensure_auth_sessions_table()
+    if _restore_persistent_auth_session():
+        return True
     users = configured_users()
     if not users:
         with st.container(border=True, key="login_card"):
@@ -1512,16 +2796,15 @@ def require_login() -> bool:
 
     if st.session_state.get("authenticated"):
         if "page_label" not in st.session_state:
-            st.session_state["page_label"] = "📂 Módulos"
+            st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
         if "page" not in st.session_state:
-            st.session_state["page"] = "Modulos"
+            st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
         with st.sidebar:
             user = st.session_state.get("auth_user", "")
             if user:
                 st.caption(str(user))
             if st.button("Sair", help="Sair do sistema"):
-                st.session_state.pop("authenticated", None)
-                st.session_state.pop("auth_user", None)
+                _logout_authenticated_session()
                 st.rerun()
         return True
 
@@ -1540,11 +2823,13 @@ def require_login() -> bool:
             submitted = st.form_submit_button("Entrar")
     if submitted:
         if users.get(user) == password:
+            token = create_auth_session(user)
+            _set_auth_persistence(token)
             st.session_state["authenticated"] = True
             st.session_state["auth_user"] = user
-            st.session_state["page_label"] = "📂 Módulos"
-            st.session_state["page"] = "Modulos"
-            st.query_params["page"] = "Modulos"
+            st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+            st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
+            st.query_params["page"] = AUTH_SESSION_DEFAULT_PAGE
             st.rerun()
         else:
             st.error("Usuario ou senha invalidos.")
@@ -1569,29 +2854,447 @@ def render_sidebar() -> tuple[str, str]:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_items:
         requested_label = "📂 Módulos"
-    page_label = st.sidebar.radio("Menu", menu_items, index=menu_items.index(requested_label))
-    page = menu_map[page_label]
-    st.session_state["page_label"] = page_label
-    st.session_state["page"] = page
-    if st.query_params.get("page") != page:
-        st.query_params["page"] = page
-    saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
-    current_year, current_month = parse_competencia(saved_competencia)
-    years = list(range(current_year - 5, current_year + 6))
-    month_options = [f"{m:02d}" for m in range(1, 13)]
-    y1, y2 = st.sidebar.columns(2)
-    year = y1.selectbox("Ano", years, index=years.index(current_year))
-    month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"))
-    competencia = f"{int(year)}-{month}"
-    st.session_state["competencia"] = competencia
-    set_setting("ultima_competencia", competencia)
-    touch_active_session(page)
-    active_now = load_active_sessions()
-    st.sidebar.caption(f"Usuarios online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
-    if not active_now.empty:
-        names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
-        st.sidebar.caption(names)
+    with st.sidebar:
+        render_company_logo(width=170, location="sidebar")
+        page_label = st.radio("Menu", menu_items, index=menu_items.index(requested_label))
+        page = menu_map[page_label]
+        st.session_state["page_label"] = page_label
+        st.session_state["page"] = page
+        if st.query_params.get("page") != page:
+            st.query_params["page"] = page
+        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        current_year, current_month = parse_competencia(saved_competencia)
+        years = list(range(current_year - 5, current_year + 6))
+        month_options = [f"{m:02d}" for m in range(1, 13)]
+        y1, y2 = st.sidebar.columns(2)
+        year = y1.selectbox("Ano", years, index=years.index(current_year))
+        month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"))
+        competencia = f"{int(year)}-{month}"
+        st.session_state["competencia"] = competencia
+        set_setting("ultima_competencia", competencia)
+        touch_active_session(page)
+        active_now = load_active_sessions()
+        st.sidebar.caption(f"Usuarios online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
+        if not active_now.empty:
+            names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
+            st.sidebar.caption(names)
     return page, competencia
+
+
+def require_login_secure() -> bool:
+    init_db()
+    ensure_auth_sessions_table()
+    if _restore_persistent_auth_session():
+        return True
+    legacy_users = configured_users()
+    total_users = query_df("SELECT COUNT(*) AS total FROM users")
+    has_users = not total_users.empty and int(total_users.iloc[0]["total"] or 0) > 0
+    has_legacy = bool(legacy_users)
+    if not has_users and not has_legacy:
+        with st.container(border=True, key="login_card_secure"):
+            st.markdown(
+                """
+                <div class="login-brand"><span class="login-mark">E</span>Excelencia Contabilidade</div>
+                <div class="login-title">Controle de Empresas</div>
+                <div class="login-subtitle">Acesso bloqueado. Configure usuários na tabela, em secrets ou por variável de ambiente.</div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.warning(
+                "Defina ao menos um usuário em `users`, `[auth.users]` no secrets.toml ou via `CONTROLE_EMPRESAS_USER`/`CONTROLE_EMPRESAS_PASSWORD`.",
+            )
+        return False
+
+    if st.session_state.get("authenticated") or st.session_state.get("is_authenticated"):
+        username = current_username()
+        user_row = get_user_row(username)
+        if user_row and int(user_row.get("ativo", 1) or 0) == 0:
+            remove_active_session()
+            _logout_authenticated_session()
+            st.error("Usuário inativo. Procure o administrador.")
+            return False
+        if user_row:
+            st.session_state["user_role"] = user_role_for(username, user_row.get("role", "usuario"))
+            st.session_state["user_name"] = user_display_name_for(username, user_row.get("nome", username))
+        if "page_label" not in st.session_state:
+            st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+        if "page" not in st.session_state:
+            st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
+        with st.sidebar:
+            st.markdown(f"**Usuário:** {current_user_display_name()}")
+            st.caption(f"Perfil: {user_role_label(current_user_role())}")
+            if st.button("Sair", key="logout_secure", help="Sair do sistema"):
+                remove_active_session()
+                _logout_authenticated_session()
+                st.rerun()
+        return True
+
+    with st.container(border=True, key="login_card_secure"):
+        st.markdown(
+            """
+            <div class="login-brand"><span class="login-mark">E</span>Excelencia Contabilidade</div>
+            <div class="login-title">Controle de Empresas</div>
+            <div class="login-subtitle">Acesso restrito ao controle operacional.</div>
+            """,
+            unsafe_allow_html=True,
+        )
+        with st.form("login_form_secure"):
+            user = st.text_input("Usuario")
+            password = st.text_input("Senha", type="password")
+            submitted = st.form_submit_button("Entrar")
+    if submitted:
+        username_norm = normalize_username(user)
+        user_row = get_user_row(username_norm)
+        if user_row and int(user_row.get("ativo", 1) or 0) == 0:
+            st.error("Usuário inativo. Procure o administrador.")
+            return False
+        if user_row and verify_password(password, user_row.get("senha_hash", "")):
+            set_authenticated_session(username_norm, user_row.get("role", "usuario"), user_row.get("nome", username_norm))
+            token = create_auth_session(username_norm)
+            _set_auth_persistence(token)
+            update_user_last_login(username_norm)
+            st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+            st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
+            st.query_params["page"] = AUTH_SESSION_DEFAULT_PAGE
+            st.rerun()
+        legacy_password = legacy_users.get(username_norm)
+        if legacy_password and legacy_password == password:
+            role = user_role_for(username_norm, user_row.get("role", "usuario") if user_row else "usuario")
+            nome = user_display_name_for(username_norm, user_row.get("nome", username_norm) if user_row else username_norm)
+            if user_row:
+                execute(
+                    """
+                    UPDATE users
+                       SET senha_hash=COALESCE(NULLIF(senha_hash,''), ?),
+                           role=?,
+                           ativo=1,
+                           nome=COALESCE(NULLIF(nome,''), ?),
+                           responsavel=COALESCE(NULLIF(responsavel,''), ?),
+                           atualizado_em=?,
+                           ultimo_login=?
+                     WHERE UPPER(username)=UPPER(?)
+                    """,
+                    (hash_password(password), role, nome, username_norm, now_str(), now_str(), username_norm),
+                )
+            else:
+                upsert_user_record(
+                    username=username_norm,
+                    nome=nome,
+                    senha_hash=hash_password(password),
+                    role=role,
+                    ativo=1,
+                    criado_por=username_norm,
+                    responsavel=username_norm,
+                    observacao="Migrado automaticamente do login legado.",
+                    ultimo_login=now_str(),
+                )
+            set_authenticated_session(username_norm, role, nome)
+            token = create_auth_session(username_norm)
+            _set_auth_persistence(token)
+            update_user_last_login(username_norm)
+            st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
+            st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
+            st.query_params["page"] = AUTH_SESSION_DEFAULT_PAGE
+            st.rerun()
+        else:
+            st.error("Usuario ou senha invalidos.")
+    return False
+
+
+def render_sidebar_secure() -> tuple[str, str]:
+    menu_map = {
+        "📂 Módulos": "Modulos",
+        "📊 Painel": "Painel",
+        "👤 Novo Cliente": "Novo Cliente",
+        "🏢 Empresas": "Empresas",
+        "📋 Demandas": "Demandas",
+        "🤖 Automação": "Automacao",
+        "💰 Faturamento": "Faturamento MEI",
+        "💾 Backup": "Backup",
+    }
+    if can_access_users_page():
+        menu_map["👥 Usuários"] = "usuarios"
+
+    requested_page = str(st.query_params.get("page", "Modulos"))
+    if requested_page == "usuarios" and not can_access_users_page():
+        st.warning("Você não tem permissão para acessar esta área.")
+        requested_page = "Modulos"
+        st.query_params["page"] = "Modulos"
+        st.session_state["page"] = "Modulos"
+        st.session_state["page_label"] = "📂 Módulos"
+
+    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "📂 Módulos")
+    if requested_label not in menu_map:
+        requested_label = st.session_state.get("page_label", "📂 Módulos")
+    if requested_label not in menu_map:
+        requested_label = "📂 Módulos"
+
+    with st.sidebar:
+        render_company_logo(width=170, location="sidebar")
+        active_now = load_active_sessions()
+        st.markdown(f"**Usuário:** {current_user_display_name()}")
+        st.caption(f"Perfil: {user_role_label(current_user_role())}")
+        st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
+        page_label = st.radio("Menu", list(menu_map.keys()), index=list(menu_map.keys()).index(requested_label), key="menu_secure")
+        page = menu_map[page_label]
+        st.session_state["page_label"] = page_label
+        st.session_state["page"] = page
+        if st.query_params.get("page") != page:
+            st.query_params["page"] = page
+
+        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        current_year, current_month = parse_competencia(saved_competencia)
+        years = list(range(current_year - 5, current_year + 6))
+        month_options = [f"{m:02d}" for m in range(1, 13)]
+        y1, y2 = st.sidebar.columns(2)
+        year = y1.selectbox("Ano", years, index=years.index(current_year), key="ano_secure")
+        month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"), key="mes_secure")
+        competencia = f"{int(year)}-{month}"
+        st.session_state["competencia"] = competencia
+        set_setting("ultima_competencia", competencia)
+        touch_active_session(page)
+        active_now = load_active_sessions()
+        st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
+        if not active_now.empty:
+            names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
+            st.caption(names)
+    return page, competencia
+
+
+def render_usuarios() -> None:
+    if not can_access_users_page():
+        st.warning("Você não tem permissão para acessar esta área.")
+        st.stop()
+
+    st.title("Gestão de Usuários")
+    st.caption("Crie, visualize e gerencie acessos ao sistema.")
+
+    all_users = get_users_df()
+    visible_users = get_visible_users_df()
+    scope_df = visible_users.copy()
+
+    if is_admin_geral():
+        total_users = len(all_users)
+        active_users = int((all_users["ativo"] == 1).sum()) if not all_users.empty else 0
+        inactive_users = int((all_users["ativo"] == 0).sum()) if not all_users.empty else 0
+        active_now = load_active_sessions()
+        online_users = active_now["usuario"].nunique()
+    else:
+        total_users = len(scope_df)
+        active_users = int((scope_df["ativo"] == 1).sum()) if not scope_df.empty else 0
+        inactive_users = int((scope_df["ativo"] == 0).sum()) if not scope_df.empty else 0
+        active_now = load_active_sessions()
+        if not scope_df.empty:
+            allowed_users = set(scope_df["username"].astype(str).str.upper().tolist())
+            online_users = int(active_now["usuario"].astype(str).str.upper().isin(allowed_users).sum())
+        else:
+            online_users = 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total", total_users)
+    c2.metric("Ativos", active_users)
+    c3.metric("Inativos", inactive_users)
+    c4.metric("Online", int(online_users))
+
+    if is_admin_geral() and not all_users.empty:
+        role_counts = all_users["role"].fillna("usuario").value_counts().to_dict()
+        cols = st.columns(min(4, len(role_counts)) or 1)
+        for idx, (role, qty) in enumerate(role_counts.items()):
+            cols[idx % len(cols)].metric(user_role_label(role), int(qty))
+
+    filters = st.columns([1.3, 0.8, 0.8])
+    search = filters[0].text_input("Buscar por nome ou login", key="usuarios_busca")
+    role_options = ["Todos"] + list(USER_ROLES.keys())
+    role_filter = filters[1].selectbox("Perfil", role_options, key="usuarios_perfil")
+    status_filter = filters[2].selectbox("Status", ["Todos", "Ativos", "Inativos"], key="usuarios_status")
+
+    filtered = scope_df.copy()
+    if not filtered.empty and search:
+        mask = (
+            filtered["username"].astype(str).str.contains(search, case=False, na=False)
+            | filtered["nome"].astype(str).str.contains(search, case=False, na=False)
+        )
+        filtered = filtered.loc[mask].copy()
+    if not filtered.empty and role_filter != "Todos":
+        filtered = filtered.loc[filtered["role"].astype(str).eq(role_filter)].copy()
+    if not filtered.empty and status_filter == "Ativos":
+        filtered = filtered.loc[filtered["ativo"] == 1].copy()
+    if not filtered.empty and status_filter == "Inativos":
+        filtered = filtered.loc[filtered["ativo"] == 0].copy()
+
+    st.dataframe(
+        filtered[["id", "username", "nome", "role", "ativo", "responsavel", "criado_por", "criado_em", "atualizado_em", "ultimo_login", "observacao"]]
+        if not filtered.empty
+        else filtered,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "id": st.column_config.NumberColumn("id"),
+            "username": st.column_config.TextColumn("username"),
+            "nome": st.column_config.TextColumn("nome"),
+            "role": st.column_config.TextColumn("role"),
+            "ativo": st.column_config.NumberColumn("ativo"),
+            "responsavel": st.column_config.TextColumn("responsavel"),
+            "criado_por": st.column_config.TextColumn("criado_por"),
+            "criado_em": st.column_config.TextColumn("criado_em"),
+            "atualizado_em": st.column_config.TextColumn("atualizado_em"),
+            "ultimo_login": st.column_config.TextColumn("ultimo_login"),
+            "observacao": st.column_config.TextColumn("observacao"),
+        },
+    )
+
+    if can_manage_users():
+        with st.expander("+ Criar novo usuário", expanded=is_admin_geral()):
+            with st.form("create_user_form", clear_on_submit=True):
+                nome = st.text_input("Nome")
+                username = st.text_input("Usuário/login")
+                if is_admin_geral():
+                    role = st.selectbox("Perfil", list(USER_ROLES.keys()), index=3)
+                    responsavel = st.text_input("Responsável")
+                else:
+                    role = st.selectbox("Perfil", ["estagiario", "usuario"], index=0)
+                    responsavel = st.text_input("Responsável", value="RAFAEL", disabled=True)
+                senha = st.text_input("Senha", type="password")
+                confirmar = st.text_input("Confirmar senha", type="password")
+                ativo = st.checkbox("Ativo", value=True)
+                observacao = st.text_area("Observação")
+                submit_create = st.form_submit_button("Criar usuário")
+            if submit_create:
+                username_norm = normalize_username(username)
+                if not username_norm:
+                    st.error("Usuário/login é obrigatório.")
+                elif get_user_row(username_norm):
+                    st.error("Já existe um usuário com esse login.")
+                elif not senha or not confirmar:
+                    st.error("Informe a senha e a confirmação.")
+                elif len(senha) < PASSWORD_MIN_LENGTH:
+                    st.error(f"A senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.")
+                elif senha != confirmar:
+                    st.error("Senha e confirmação não conferem.")
+                elif not is_admin_geral() and role not in {"estagiario", "usuario"}:
+                    st.error("RAFAEL não pode criar esse perfil.")
+                else:
+                    responsavel_final = normalize_username(responsavel) if is_admin_geral() else "RAFAEL"
+                    if not is_admin_geral():
+                        responsavel_final = "RAFAEL"
+                    upsert_user_record(
+                        username=username_norm,
+                        nome=nome or username_norm,
+                        senha_hash=hash_password(senha),
+                        role=role,
+                        ativo=1 if ativo else 0,
+                        criado_por=current_username(),
+                        responsavel=responsavel_final or username_norm,
+                        observacao=observacao,
+                    )
+                    st.success("Usuário criado com sucesso.")
+                    st.rerun()
+
+    if filtered.empty:
+        st.info("Nenhum usuário encontrado com os filtros aplicados.")
+        return
+
+    for _, row in filtered.sort_values(["username"]).iterrows():
+        username = str(row["username"])
+        display_title = f'{username} - {row.get("nome", "")}'.strip(" -")
+        with st.expander(display_title, expanded=False):
+            editable = can_manage_user(row)
+            if not editable:
+                st.info("Você não tem permissão para editar este usuário.")
+                continue
+            row_role = str(row.get("role") or "usuario")
+            is_special_user = normalize_username(username) in SPECIAL_USER_ROLES
+            with st.form(f"edit_user_{row['id']}"):
+                nome = st.text_input("Nome", value=str(row.get("nome", "")))
+                if is_admin_geral() and not is_special_user:
+                    role = st.selectbox("Perfil", list(USER_ROLES.keys()), index=list(USER_ROLES.keys()).index(row_role) if row_role in USER_ROLES else 3)
+                    responsavel = st.text_input("Responsável", value=str(row.get("responsavel", "")))
+                    criado_por = st.text_input("Criado por", value=str(row.get("criado_por", "")))
+                else:
+                    role = row_role
+                    responsavel = str(row.get("responsavel", ""))
+                    criado_por = str(row.get("criado_por", ""))
+                    st.text_input("Perfil", value=user_role_label(role), disabled=True)
+                    st.text_input("Responsável", value=responsavel, disabled=True)
+                ativo = st.checkbox("Ativo", value=int(row.get("ativo", 1) or 1) == 1)
+                observacao = st.text_area("Observação", value=str(row.get("observacao", "")))
+                submit_edit = st.form_submit_button("Salvar alterações")
+            if submit_edit:
+                role_final = row_role if not is_admin_geral() or is_special_user else role
+                if not is_admin_geral() and role_final not in {"estagiario", "usuario", "contador"}:
+                    st.error("Perfil não permitido para este usuário.")
+                    continue
+                if normalize_username(username) == "DMLIMA":
+                    role_final = "admin_geral"
+                    responsavel = "DMLIMA"
+                if normalize_username(username) == "RAFAEL":
+                    role_final = "contador"
+                    responsavel = "RAFAEL"
+                if int(row.get("ativo", 1) or 1) == 1 and not ativo and not can_disable_user_record(row.to_dict()):
+                    st.error("Não é permitido desativar o último administrador ativo.")
+                    continue
+                execute(
+                    """
+                    UPDATE users
+                       SET nome=?,
+                           role=?,
+                           ativo=?,
+                           responsavel=?,
+                           criado_por=?,
+                           observacao=?,
+                           atualizado_em=?
+                     WHERE id=?
+                    """,
+                    (
+                        nome,
+                        role_final,
+                        1 if ativo else 0,
+                        normalize_username(responsavel) or normalize_username(username),
+                        normalize_username(criado_por) or str(row.get("criado_por", "")),
+                        observacao,
+                        now_str(),
+                        int(row["id"]),
+                    ),
+                )
+                st.success("Usuário atualizado.")
+                st.rerun()
+
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                if int(row.get("ativo", 1) or 1) == 1:
+                    disable_confirm = st.checkbox("Confirmo a desativação", key=f"disable_confirm_{row['id']}")
+                    if st.button("Desativar", key=f"disable_btn_{row['id']}", disabled=not disable_confirm):
+                        if not can_disable_user_record(row.to_dict()):
+                            st.error("Não é permitido desativar o último administrador ativo.")
+                        else:
+                            execute("UPDATE users SET ativo=0, atualizado_em=? WHERE id=?", (now_str(), int(row["id"])))
+                            st.success("Usuário desativado.")
+                            st.rerun()
+                else:
+                    if st.button("Reativar", key=f"reactivate_btn_{row['id']}"):
+                        execute("UPDATE users SET ativo=1, atualizado_em=? WHERE id=?", (now_str(), int(row["id"])))
+                        st.success("Usuário reativado.")
+                        st.rerun()
+            with col_b:
+                with st.form(f"reset_pwd_{row['id']}"):
+                    nova_senha = st.text_input("Nova senha", type="password")
+                    confirmar_nova = st.text_input("Confirmar nova senha", type="password")
+                    submit_reset = st.form_submit_button("Resetar senha")
+                if submit_reset:
+                    if not nova_senha or len(nova_senha) < PASSWORD_MIN_LENGTH:
+                        st.error(f"A senha deve ter pelo menos {PASSWORD_MIN_LENGTH} caracteres.")
+                    elif nova_senha != confirmar_nova:
+                        st.error("Senha e confirmação não conferem.")
+                    else:
+                        execute(
+                            "UPDATE users SET senha_hash=?, atualizado_em=? WHERE id=?",
+                            (hash_password(nova_senha), now_str(), int(row["id"])),
+                        )
+                        st.success("Senha redefinida.")
+                        st.rerun()
+            with col_c:
+                st.caption(f"Criado em: {row.get('criado_em', '')}")
+                st.caption(f"Último login: {row.get('ultimo_login', '')}")
 
 
 def render_modulos() -> None:
@@ -1804,12 +3507,143 @@ def render_painel(competencia: str) -> None:
         )
 
 
+def reset_empresa_cadastro_on_state() -> None:
+    st.session_state["empresa_cadastro_on_open"] = False
+    st.session_state["empresa_cadastro_on_mode"] = "lookup"
+    st.session_state["empresa_cadastro_on_result"] = {}
+    st.session_state["empresa_cadastro_on_error"] = ""
+    st.session_state["empresa_cadastro_on_existing_id"] = 0
+    st.session_state["empresa_cadastro_on_lookup_value"] = ""
+
+
+def render_empresa_cadastro_on_panel() -> None:
+    if not st.session_state.get("empresa_cadastro_on_open", False):
+        return
+
+    with st.container(border=True):
+        st.markdown("<h5 style='margin-top: 0px; margin-bottom: 4px;'>Cadastro On / Incluir por CNPJ</h5>", unsafe_allow_html=True)
+        st.caption("Digite apenas o CNPJ. Se existir na base, o sistema oferece atualizar os dados cadastrais.")
+        with st.form("empresa_cadastro_on_lookup_form", clear_on_submit=False):
+            cnpj_lookup = st.text_input("CNPJ", value=str(st.session_state.get("empresa_cadastro_on_lookup_value", "")))
+            c1, c2 = st.columns(2)
+            submit_lookup = c1.form_submit_button(f"{BUTTON_LABELS['buscar']} e incluir", type="primary")
+            cancel_lookup = c2.form_submit_button(BUTTON_LABELS["cancelar"], key="btn_cadastro_on_cancelar")
+
+        if cancel_lookup:
+            reset_empresa_cadastro_on_state()
+            st.rerun()
+
+        if submit_lookup:
+            digits = cnpj_digits(cnpj_lookup)
+            st.session_state["empresa_cadastro_on_lookup_value"] = digits
+            if len(digits) != 14:
+                st.session_state["empresa_cadastro_on_error"] = "CNPJ invalido. Informe 14 digitos."
+                st.session_state["empresa_cadastro_on_mode"] = "manual"
+                st.rerun()
+
+            existing = empresa_row_by_cnpj(normalize_cnpj(digits))
+            try:
+                lookup_data = fetch_empresa_cadastro_on(digits)
+                lookup_data["cnpj"] = digits
+                if existing:
+                    st.session_state["empresa_cadastro_on_result"] = lookup_data
+                    st.session_state["empresa_cadastro_on_existing_id"] = int(existing.get("id", 0) or 0)
+                    st.session_state["empresa_cadastro_on_error"] = "CNPJ ja cadastrado. Use a atualizacao para trazer os dados cadastrais mais recentes."
+                    st.session_state["empresa_cadastro_on_mode"] = "review"
+                    st.rerun()
+
+                save_empresa(lookup_data, None)
+                st.session_state["empresa_save_notice"] = f"Cliente incluido com sucesso por CNPJ {normalize_cnpj(digits)}."
+                reset_empresa_cadastro_on_state()
+                st.rerun()
+            except Exception as exc:
+                st.session_state["empresa_cadastro_on_error"] = str(exc)
+                st.session_state["empresa_cadastro_on_mode"] = "manual"
+                if existing:
+                    st.session_state["empresa_cadastro_on_result"] = existing
+                    st.session_state["empresa_cadastro_on_existing_id"] = int(existing.get("id", 0) or 0)
+                st.rerun()
+
+        if st.session_state.get("empresa_cadastro_on_error"):
+            st.error(st.session_state["empresa_cadastro_on_error"])
+
+        if st.session_state.get("empresa_cadastro_on_mode") == "review" and st.session_state.get("empresa_cadastro_on_result"):
+            review_data = st.session_state["empresa_cadastro_on_result"]
+            existing_id = int(st.session_state.get("empresa_cadastro_on_existing_id", 0) or 0)
+            st.info(
+                f"CNPJ localizado. Razao social: {review_data.get('razao_social', '')}. "
+                "Clique para atualizar os dados cadastrais do cliente existente."
+            )
+            c1, c2 = st.columns(2)
+            if c1.button(f"{BUTTON_LABELS['atualizar']} dados cadastrais", key="btn_cadastro_on_atualizar", type="primary", use_container_width=True):
+                save_empresa(review_data, existing_id)
+                st.session_state["empresa_save_notice"] = f"Dados cadastrais atualizados para {normalize_cnpj(review_data.get('cnpj', ''))}."
+                reset_empresa_cadastro_on_state()
+                st.rerun()
+            if c2.button(BUTTON_LABELS["cancelar"], key="btn_cadastro_on_cancelar_review", use_container_width=True):
+                reset_empresa_cadastro_on_state()
+                st.rerun()
+
+        if st.session_state.get("empresa_cadastro_on_mode") == "manual":
+            base_row = st.session_state.get("empresa_cadastro_on_result") or {}
+            with st.form("empresa_cadastro_on_manual_form", clear_on_submit=False):
+                m1, m2 = st.columns(2)
+                manual_cnpj = m1.text_input("CNPJ", value=st.session_state.get("empresa_cadastro_on_lookup_value", ""))
+                manual_razao = m2.text_input("Razao social", value=str(base_row.get("razao_social", "")))
+                manual_fantasia = m1.text_input("Nome fantasia", value=str(base_row.get("nome_fantasia", "")))
+                manual_apelido = m2.text_input("Apelido", value=str(base_row.get("apelido", "")))
+                manual_regime = m1.selectbox("Regime", REGIMES, index=REGIMES.index(_regime_option(base_row.get("regime", REGIMES[0]))) if _regime_option(base_row.get("regime", REGIMES[0])) in REGIMES else 0)
+                manual_cidade = m2.text_input("Cidade", value=str(base_row.get("cidade", "")))
+                manual_uf = m1.text_input("UF", value=str(base_row.get("uf", "")), max_chars=2)
+                manual_abertura = m2.text_input("Abertura", value=str(base_row.get("abertura", "")))
+                manual_situacao = m1.text_input("Situação", value=str(base_row.get("situacao", "")))
+                manual_porte = m2.text_input("Porte", value=str(base_row.get("porte", "")))
+                manual_natureza = m1.text_input("Natureza jurídica", value=str(base_row.get("natureza_juridica", "")))
+                manual_capital = m2.text_input("Capital social", value=str(base_row.get("capital_social", "")))
+                manual_simples = m1.checkbox("Simples optante", value=int(base_row.get("simples_optante", 0) or 0) == 1)
+                manual_mei = m2.checkbox("MEI optante", value=int(base_row.get("mei_optante", 0) or 0) == 1)
+                manual_inativo = st.checkbox("Inativa", value=int(base_row.get("inativo", 0) or 0) == 1)
+                b1, b2 = st.columns(2)
+                submit_manual = b1.form_submit_button(f"{BUTTON_LABELS['salvar']} manualmente", type="primary")
+                cancel_manual = b2.form_submit_button(BUTTON_LABELS["cancelar"], key="btn_cadastro_on_cancelar_manual")
+            if cancel_manual:
+                reset_empresa_cadastro_on_state()
+                st.rerun()
+            if submit_manual:
+                manual_payload = {
+                    "cnpj": manual_cnpj,
+                    "razao_social": manual_razao,
+                    "nome_fantasia": manual_fantasia,
+                    "apelido": manual_apelido,
+                    "regime": manual_regime,
+                    "cidade": manual_cidade,
+                    "uf": manual_uf,
+                    "abertura": manual_abertura,
+                    "situacao": manual_situacao,
+                    "porte": manual_porte,
+                    "natureza_juridica": manual_natureza,
+                    "capital_social": manual_capital,
+                    "simples_optante": 1 if manual_simples else 0,
+                    "mei_optante": 1 if manual_mei else 0,
+                    "inativo": 1 if manual_inativo else 0,
+                }
+                if len(cnpj_digits(manual_cnpj)) != 14:
+                    st.error("CNPJ invalido. Informe 14 digitos.")
+                elif not manual_razao.strip():
+                    st.error("Razao social e obrigatoria.")
+                else:
+                    existing_id = int(st.session_state.get("empresa_cadastro_on_existing_id", 0) or 0)
+                    save_empresa(manual_payload, existing_id or None)
+                    st.session_state["empresa_save_notice"] = "Cadastro salvo manualmente."
+                    reset_empresa_cadastro_on_state()
+                    st.rerun()
+
+
 def render_empresas() -> None:
     st.markdown("**Empresas**")
 
     if msg := st.session_state.pop("empresa_save_notice", None):
-        st.success(msg)
-        st.toast(msg)
+        st.toast(msg, icon="✅")
 
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
@@ -1817,14 +3651,27 @@ def render_empresas() -> None:
         st.session_state["empresas_view_mode"] = "ativas"
     if "show_import_uploader" not in st.session_state:
         st.session_state["show_import_uploader"] = False
+    if "empresa_cadastro_on_open" not in st.session_state:
+        st.session_state["empresa_cadastro_on_open"] = False
+    if "empresa_cadastro_on_mode" not in st.session_state:
+        st.session_state["empresa_cadastro_on_mode"] = "lookup"
+    if "empresa_cadastro_on_result" not in st.session_state:
+        st.session_state["empresa_cadastro_on_result"] = {}
+    if "empresa_cadastro_on_error" not in st.session_state:
+        st.session_state["empresa_cadastro_on_error"] = ""
+    if "empresa_cadastro_on_existing_id" not in st.session_state:
+        st.session_state["empresa_cadastro_on_existing_id"] = 0
+    if "empresa_cadastro_on_lookup_value" not in st.session_state:
+        st.session_state["empresa_cadastro_on_lookup_value"] = ""
+
+    inject_scroll_keeper("empresas")
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5, c6 = st.columns([1.8, 1.0, 0.7, 0.8, 0.8, 0.8])
-        search = c1.text_input("Buscar", value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder="Buscar")
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([1.8, 1.0, 1.2, 0.7, 0.8, 0.8, 0.8])
+        search = c1.text_input(BUTTON_LABELS["buscar"], value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder=BUTTON_LABELS["buscar"])
         st.session_state["empresa_search"] = search
-        regime_filter = c2.selectbox("Regime", ["Todos", *REGIMES], index=0, label_visibility="collapsed")
+        regime_filter = c2.selectbox("Regime", ["📋 Todos", *REGIMES], index=0, label_visibility="collapsed")
 
-        # Load and filter companies in between defining controls and rendering buttons
         empresas = load_empresas(active_only=False)
         filtered = empresas.copy()
         if search:
@@ -1836,7 +3683,7 @@ def render_empresas() -> None:
                 | filtered["apelido"].astype(str).str.lower().str.contains(q, na=False)
             )
             filtered = filtered[mask]
-        if regime_filter != "Todos":
+        if regime_filter != "📋 Todos":
             filtered = filtered[filtered["regime"] == regime_filter]
         if st.session_state["empresas_view_mode"] == "excluidas":
             filtered = filtered[filtered["is_ativo"] == 0]
@@ -1846,19 +3693,22 @@ def render_empresas() -> None:
         display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
         export_df = display_df if not display_df.empty else filtered
 
-        # Render action buttons
-        if c3.button("Ativas", type="primary" if st.session_state["empresas_view_mode"] == "ativas" else "secondary", use_container_width=True):
+        if c3.button(BUTTON_LABELS["incluir_cnpj"], key="btn_empresas_incluir_cnpj", type="primary", use_container_width=True):
+            st.session_state["empresa_cadastro_on_open"] = True
+            st.session_state["empresa_cadastro_on_mode"] = "lookup"
+            st.session_state["empresa_cadastro_on_error"] = ""
+            st.rerun()
+        if c4.button(BUTTON_LABELS["ativas"], key="btn_empresas_ativas", type="primary" if st.session_state["empresas_view_mode"] == "ativas" else "secondary", use_container_width=True):
             st.session_state["empresas_view_mode"] = "ativas"
             st.rerun()
-        if c4.button("Excluídas", type="primary" if st.session_state["empresas_view_mode"] == "excluidas" else "secondary", use_container_width=True):
+        if c5.button(BUTTON_LABELS["excluidas"], key="btn_empresas_excluidas", type="primary" if st.session_state["empresas_view_mode"] == "excluidas" else "secondary", use_container_width=True):
             st.session_state["empresas_view_mode"] = "excluidas"
             st.rerun()
-        if c5.button("Importar", type="primary" if st.session_state.get("show_import_uploader", False) else "secondary", use_container_width=True):
+        if c6.button(BUTTON_LABELS["importar"], key="btn_empresas_importar", type="primary" if st.session_state.get("show_import_uploader", False) else "secondary", use_container_width=True):
             st.session_state["show_import_uploader"] = not st.session_state.get("show_import_uploader", False)
             st.rerun()
-        
-        c6.download_button(
-            "Exportar",
+        c7.download_button(
+            BUTTON_LABELS["exportar"],
             data=empresas_export_csv(export_df),
             file_name=f"empresas_export_{datetime.now():%Y%m%d_%H%M%S}.csv",
             mime="text/csv",
@@ -1867,11 +3717,12 @@ def render_empresas() -> None:
 
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
 
-    # Elegant, premium slide-down uploader card
+    render_empresa_cadastro_on_panel()
+
     if st.session_state.get("show_import_uploader", False):
         with st.container(border=True):
             st.markdown("<h5 style='margin-top: 0px; margin-bottom: 4px;'>Importar Empresas</h5>", unsafe_allow_html=True)
-            st.caption("Faça upload de uma planilha Excel (.xlsx, .xls) ou arquivo CSV para cadastrar ou atualizar empresas em massa por ID ou CNPJ.")
+            st.caption("Faca upload de uma planilha Excel (.xlsx, .xls) ou arquivo CSV para cadastrar ou atualizar empresas em massa por ID ou CNPJ.")
             uploaded_import = st.file_uploader(
                 "Upload de arquivo",
                 type=["csv", "xlsx", "xls"],
@@ -1885,22 +3736,25 @@ def render_empresas() -> None:
                         imported_df = empresas_import_dataframe(uploaded_import)
                         updated, created = empresas_apply_import(imported_df)
                         st.session_state["empresas_last_import_hash"] = import_hash
-                        st.session_state["empresa_save_notice"] = f"Importação concluída. Atualizados: {updated}. Criados: {created}."
+                        st.session_state["empresa_save_notice"] = f"Importacao concluida. Atualizados: {updated}. Criados: {created}."
                         st.session_state["show_import_uploader"] = False
                         st.rerun()
                     except Exception as exc:
-                        st.error(f"Não foi possível importar o arquivo. Detalhe: {exc}")
+                        st.error(f"Nao foi possivel importar o arquivo. Detalhe: {exc}")
 
     if filtered.empty:
         st.info("Nenhuma empresa encontrada.")
         return
 
+    table_height = calc_empresas_table_height(len(display_df))
     edited_df = show_table(
         display_df,
         key="empresas_editor",
-        height=700,
+        height=table_height,
+        auto_height=True,
         editable=editable_mode,
         disabled=["id"],
+        row_height=35,
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
             "cnpj": st.column_config.TextColumn("cnpj", width=130),
@@ -1937,33 +3791,86 @@ def render_empresas() -> None:
                     save_empresa(payload, empresa_id)
                     changed += 1
             if changed:
-                st.session_state["empresa_save_notice"] = f"Alterações salvas automaticamente. Registros atualizados: {changed}."
-                st.rerun()
+                st.toast(f"✅ Alterações salvas automaticamente. Registros atualizados: {changed}.", icon="✅")
+                mark_restore_scroll("empresas")
         except Exception as exc:
-            st.error(f"Não foi possível salvar as alterações. Detalhe: {exc}")
+            st.error(f"Nao foi possivel salvar as alteracoes. Detalhe: {exc}")
     else:
-        st.caption("Exibindo somente empresas excluídas.")
+        st.caption("Exibindo somente empresas exclu?das.")
+
+    restore_scroll_if_needed("empresas")
+
+def clear_novo_cliente_cadastro_on_state() -> None:
+    st.session_state["novo_cliente_on_lookup"] = ""
+    st.session_state["novo_cliente_on_data"] = {}
+    st.session_state["novo_cliente_on_error"] = ""
+
+
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
 
+    if "novo_cliente_on_lookup" not in st.session_state:
+        st.session_state["novo_cliente_on_lookup"] = ""
+    if "novo_cliente_on_data" not in st.session_state:
+        st.session_state["novo_cliente_on_data"] = {}
+    if "novo_cliente_on_error" not in st.session_state:
+        st.session_state["novo_cliente_on_error"] = ""
+
+    with st.container(border=True):
+        st.markdown("<h5 style='margin-top:0;margin-bottom:4px;'>Cadastro On</h5>", unsafe_allow_html=True)
+        st.caption("Use o CNPJ para consultar os dados cadastrais e preencher o formul?rio manual antes de salvar.")
+        c1, c2, c3 = st.columns([1.3, 0.7, 0.7])
+        lookup_cnpj = c1.text_input("CNPJ", value=st.session_state.get("novo_cliente_on_lookup", ""), label_visibility="collapsed", placeholder="CNPJ")
+        if c2.button(BUTTON_LABELS["cadastro_on"], key="btn_novo_cliente_cadastro_on", type="primary", use_container_width=True):
+            digits = only_digits(lookup_cnpj)
+            if not cnpj_valido(digits):
+                st.session_state["novo_cliente_on_error"] = "Informe um CNPJ v?lido com 14 d?gitos."
+            else:
+                try:
+                    info = fetch_empresa_cadastro_on(digits)
+                    st.session_state["novo_cliente_on_lookup"] = digits
+                    st.session_state["novo_cliente_on_data"] = info
+                    st.session_state["novo_cliente_on_error"] = ""
+                except Exception as exc:
+                    st.session_state["novo_cliente_on_error"] = str(exc) or "A consulta online falhou. Tente novamente ou preencha manualmente."
+                st.rerun()
+        if c3.button(BUTTON_LABELS["limpar"], key="btn_novo_cliente_limpar", use_container_width=True):
+            clear_novo_cliente_cadastro_on_state()
+            st.rerun()
+        if st.session_state.get("novo_cliente_on_error"):
+            st.error(st.session_state["novo_cliente_on_error"])
+        if st.session_state.get("novo_cliente_on_data"):
+            info = st.session_state["novo_cliente_on_data"]
+            st.info(f"Dados carregados de {info.get('source', 'consulta online')}.")
+
+    prefill = st.session_state.get("novo_cliente_on_data") or {}
+
     with st.container(border=True):
         with st.form("novo_cliente_form"):
             c1, c2 = st.columns(2)
-            cnpj = c1.text_input("CNPJ")
-            razao = c2.text_input("Razao social")
-            fantasia = c1.text_input("Nome fantasia")
-            apelido = c2.text_input("Apelido")
-            regime = c1.selectbox("Regime", REGIMES, index=0)
-            mensalidade = c2.text_input("Mensalidade")
-            cidade = c1.text_input("Cidade")
-            uf = c2.text_input("UF", max_chars=2)
-            inativo = st.checkbox("Inativa", value=False)
+            cnpj = c1.text_input("CNPJ", value=_first_filled(prefill.get("cnpj"), st.session_state.get("novo_cliente_on_lookup", "")))
+            razao = c2.text_input("Razao social", value=_first_filled(prefill.get("razao_social")))
+            fantasia = c1.text_input("Nome fantasia", value=_first_filled(prefill.get("nome_fantasia")))
+            apelido = c2.text_input("Apelido", value=_first_filled(prefill.get("apelido")))
+            regime = c1.selectbox("Regime", REGIMES, index=REGIMES.index(_regime_option(prefill.get("regime", REGIMES[0]))) if _regime_option(prefill.get("regime", REGIMES[0])) in REGIMES else 0)
+            abertura = c2.text_input("Abertura", value=_first_filled(prefill.get("abertura")))
+            natureza_juridica = c1.text_input("Natureza juridica", value=_first_filled(prefill.get("natureza_juridica")))
+            situacao = c2.text_input("Situacao", value=_first_filled(prefill.get("situacao")))
+            capital_social = c1.text_input("Capital social", value=_first_filled(prefill.get("capital_social")))
+            porte = c2.text_input("Porte", value=_first_filled(prefill.get("porte")))
+            cidade = c1.text_input("Cidade", value=_first_filled(prefill.get("cidade")))
+            uf = c2.text_input("UF", value=_first_filled(prefill.get("uf")), max_chars=2)
+            simples_optante = c1.checkbox("Simples optante", value=int(prefill.get("simples_optante", 0) or 0) == 1)
+            mei_optante = c2.checkbox("MEI optante", value=int(prefill.get("mei_optante", 0) or 0) == 1)
+            mensalidade = c1.text_input("Mensalidade", value=_first_filled(prefill.get("mensalidade", "")))
+            inativo = c2.checkbox("Inativa", value=int(prefill.get("inativo", 0) or 0) == 1)
             csave, ccancel = st.columns(2)
-            save_new = csave.form_submit_button("Salvar novo")
-            cancel_new = ccancel.form_submit_button("Voltar")
+            save_new = csave.form_submit_button(f"{BUTTON_LABELS['salvar']} novo")
+            cancel_new = ccancel.form_submit_button(BUTTON_LABELS["voltar"])
 
         if cancel_new:
+            clear_novo_cliente_cadastro_on_state()
             st.session_state["page"] = "Empresas"
             st.query_params["page"] = "Empresas"
             st.rerun()
@@ -1980,14 +3887,22 @@ def render_novo_cliente() -> None:
                             "nome_fantasia": fantasia,
                             "apelido": apelido,
                             "regime": regime,
-                            "mensalidade": mensalidade,
+                            "abertura": abertura,
+                            "natureza_juridica": natureza_juridica,
+                            "situacao": situacao,
+                            "capital_social": capital_social,
                             "cidade": cidade,
                             "uf": uf,
+                            "porte": porte,
+                            "simples_optante": 1 if simples_optante else 0,
+                            "mei_optante": 1 if mei_optante else 0,
+                            "mensalidade": mensalidade,
                             "inativo": inativo,
                         },
                         None,
                     )
                     st.success("Novo cliente salvo.")
+                    clear_novo_cliente_cadastro_on_state()
                     st.session_state["page"] = "Empresas"
                     st.query_params["page"] = "Empresas"
                     st.rerun()
@@ -2207,19 +4122,26 @@ def render_backup() -> None:
 def main() -> None:
     st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="expanded")
     apply_nexus_theme()
+    init_db()
 
-    if not require_login():
+    if not require_login_secure():
         return
 
     render_topbar()
     st.title("Controle de Empresas")
 
-    init_db()
     if not db_exists():
         render_setup()
         return
 
-    page, competencia = render_sidebar()
+    requested_page = str(st.query_params.get("page", "Modulos"))
+    if requested_page == "usuarios" and not can_access_users_page():
+        st.warning("Você não tem permissão para acessar esta área.")
+        st.query_params["page"] = "Modulos"
+        st.session_state["page"] = "Modulos"
+        st.session_state["page_label"] = "📂 Módulos"
+
+    page, competencia = render_sidebar_secure()
 
     if page == "Modulos":
         render_modulos()
@@ -2237,6 +4159,8 @@ def main() -> None:
         render_faturamento(competencia)
     elif page == "Backup":
         render_backup()
+    elif page == "usuarios":
+        render_usuarios()
 
 
 if __name__ == "__main__":

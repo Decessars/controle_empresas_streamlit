@@ -9,3 +9,4 @@ data/*.bak*
 *.zip
 *.log
 desktop.ini
+usuarios_senhas.txt
