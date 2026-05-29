@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import io
@@ -129,8 +129,11 @@ def apply_nexus_theme() -> None:
             background-size: auto;
             color: var(--nexus-text);
         }
-        header[data-testid="stHeader"],
-        div[data-testid="stToolbar"] {
+        header[data-testid="stHeader"] {
+            background-color: transparent !important;
+        }
+        div[data-testid="stToolbar"],
+        .stDeployButton {
             display: none !important;
         }
         [data-testid="stDecoration"] {
@@ -238,6 +241,19 @@ def apply_nexus_theme() -> None:
             background: var(--nexus-accent);
             color: white;
             border-color: rgba(255,255,255,.20);
+        }
+        .stButton > button[data-testid="stBaseButton-secondary"], 
+        .stDownloadButton > button[data-testid="stBaseButton-secondary"] {
+            background: #ffffff !important;
+            color: var(--nexus-primary) !important;
+            border: 1px solid var(--nexus-border) !important;
+            box-shadow: 0 4px 12px rgba(15,23,42,.04) !important;
+        }
+        .stButton > button[data-testid="stBaseButton-secondary"]:hover, 
+        .stDownloadButton > button[data-testid="stBaseButton-secondary"]:hover {
+            background: rgba(91,33,182,.04) !important;
+            color: var(--nexus-accent) !important;
+            border-color: var(--nexus-primary) !important;
         }
         input, textarea, select {
             background-color: #ffffff !important;
@@ -1799,69 +1815,81 @@ def render_empresas() -> None:
         st.session_state["empresa_selected_id"] = 0
     if "empresas_view_mode" not in st.session_state:
         st.session_state["empresas_view_mode"] = "ativas"
+    if "show_import_uploader" not in st.session_state:
+        st.session_state["show_import_uploader"] = False
 
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns([2.3, 1.2, 0.8, 0.8])
+        c1, c2, c3, c4, c5, c6 = st.columns([1.8, 1.0, 0.7, 0.8, 0.8, 0.8])
         search = c1.text_input("Buscar", value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder="Buscar")
+        st.session_state["empresa_search"] = search
         regime_filter = c2.selectbox("Regime", ["Todos", *REGIMES], index=0, label_visibility="collapsed")
-        if c3.button("Ativas"):
+
+        # Load and filter companies in between defining controls and rendering buttons
+        empresas = load_empresas(active_only=False)
+        filtered = empresas.copy()
+        if search:
+            q = search.strip().lower()
+            mask = (
+                filtered["cnpj"].astype(str).str.lower().str.contains(q, na=False)
+                | filtered["razao_social"].astype(str).str.lower().str.contains(q, na=False)
+                | filtered["nome_fantasia"].astype(str).str.lower().str.contains(q, na=False)
+                | filtered["apelido"].astype(str).str.lower().str.contains(q, na=False)
+            )
+            filtered = filtered[mask]
+        if regime_filter != "Todos":
+            filtered = filtered[filtered["regime"] == regime_filter]
+        if st.session_state["empresas_view_mode"] == "excluidas":
+            filtered = filtered[filtered["is_ativo"] == 0]
+        else:
+            filtered = filtered[filtered["is_ativo"] == 1]
+
+        display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
+        export_df = display_df if not display_df.empty else filtered
+
+        # Render action buttons
+        if c3.button("Ativas", type="primary" if st.session_state["empresas_view_mode"] == "ativas" else "secondary", use_container_width=True):
             st.session_state["empresas_view_mode"] = "ativas"
             st.rerun()
-        if c4.button("Excluídas"):
+        if c4.button("Excluídas", type="primary" if st.session_state["empresas_view_mode"] == "excluidas" else "secondary", use_container_width=True):
             st.session_state["empresas_view_mode"] = "excluidas"
             st.rerun()
-
-    empresas = load_empresas(active_only=False)
-    st.session_state["empresa_search"] = search
-    filtered = empresas.copy()
-    if search:
-        q = search.strip().lower()
-        mask = (
-            filtered["cnpj"].astype(str).str.lower().str.contains(q, na=False)
-            | filtered["razao_social"].astype(str).str.lower().str.contains(q, na=False)
-            | filtered["nome_fantasia"].astype(str).str.lower().str.contains(q, na=False)
-            | filtered["apelido"].astype(str).str.lower().str.contains(q, na=False)
-        )
-        filtered = filtered[mask]
-    if regime_filter != "Todos":
-        filtered = filtered[filtered["regime"] == regime_filter]
-    if st.session_state["empresas_view_mode"] == "excluidas":
-        filtered = filtered[filtered["is_ativo"] == 0]
-    else:
-        filtered = filtered[filtered["is_ativo"] == 1]
-
-    display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
-    editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
-
-    with st.container(border=True):
-        e1, e2 = st.columns([1, 1])
-        export_df = display_df if not display_df.empty else filtered
-        e1.download_button(
+        if c5.button("Importar", type="primary" if st.session_state.get("show_import_uploader", False) else "secondary", use_container_width=True):
+            st.session_state["show_import_uploader"] = not st.session_state.get("show_import_uploader", False)
+            st.rerun()
+        
+        c6.download_button(
             "Exportar",
             data=empresas_export_csv(export_df),
             file_name=f"empresas_export_{datetime.now():%Y%m%d_%H%M%S}.csv",
             mime="text/csv",
             use_container_width=True,
         )
-        uploaded_import = e2.file_uploader(
-            "Importar",
-            type=["csv", "xlsx", "xls"],
-            label_visibility="collapsed",
-            key="empresas_import_uploader",
-            help="Atualiza em massa por id ou cnpj.",
-        )
 
-    if uploaded_import is not None:
-        import_hash = hash(uploaded_import.getvalue())
-        if st.session_state.get("empresas_last_import_hash") != import_hash:
-            try:
-                imported_df = empresas_import_dataframe(uploaded_import)
-                updated, created = empresas_apply_import(imported_df)
-                st.session_state["empresas_last_import_hash"] = import_hash
-                st.session_state["empresa_save_notice"] = f"Importação concluída. Atualizados: {updated}. Criados: {created}."
-                st.rerun()
-            except Exception as exc:
-                st.error(f"Não foi possível importar o arquivo. Detalhe: {exc}")
+    editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
+
+    # Elegant, premium slide-down uploader card
+    if st.session_state.get("show_import_uploader", False):
+        with st.container(border=True):
+            st.markdown("<h5 style='margin-top: 0px; margin-bottom: 4px;'>Importar Empresas</h5>", unsafe_allow_html=True)
+            st.caption("Faça upload de uma planilha Excel (.xlsx, .xls) ou arquivo CSV para cadastrar ou atualizar empresas em massa por ID ou CNPJ.")
+            uploaded_import = st.file_uploader(
+                "Upload de arquivo",
+                type=["csv", "xlsx", "xls"],
+                label_visibility="collapsed",
+                key="empresas_import_uploader",
+            )
+            if uploaded_import is not None:
+                import_hash = hash(uploaded_import.getvalue())
+                if st.session_state.get("empresas_last_import_hash") != import_hash:
+                    try:
+                        imported_df = empresas_import_dataframe(uploaded_import)
+                        updated, created = empresas_apply_import(imported_df)
+                        st.session_state["empresas_last_import_hash"] = import_hash
+                        st.session_state["empresa_save_notice"] = f"Importação concluída. Atualizados: {updated}. Criados: {created}."
+                        st.session_state["show_import_uploader"] = False
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Não foi possível importar o arquivo. Detalhe: {exc}")
 
     if filtered.empty:
         st.info("Nenhuma empresa encontrada.")
@@ -2177,7 +2205,7 @@ def render_backup() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="expanded")
     apply_nexus_theme()
 
     if not require_login():
