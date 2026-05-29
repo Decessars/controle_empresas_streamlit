@@ -426,16 +426,17 @@ def apply_nexus_theme() -> None:
         }
         .global-menu-panel .stButton > button {
             width: auto !important;
-            min-width: 154px !important;
-            max-width: 190px !important;
-            min-height: 46px !important;
-            padding: 0.45rem 0.75rem !important;
+            min-width: 118px !important;
+            max-width: 160px !important;
+            min-height: 42px !important;
+            padding: 0.35rem 0.55rem !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             justify-content: center !important;
             text-align: center !important;
             border-radius: 12px !important;
+            box-sizing: border-box !important;
         }
         .global-menu-panel .stButton > button p {
             width: 100%;
@@ -796,10 +797,11 @@ def render_topbar() -> None:
         """,
         unsafe_allow_html=True,
     )
-    if cols[2].button("\u2630 Menu", key="global_menu_toggle", use_container_width=True):
+    if cols[2].button("\u2630 Menu", key="global_menu_toggle"):
         st.session_state["global_menu_open"] = not st.session_state.get("global_menu_open", False)
 
     if st.session_state.get("global_menu_open", False):
+        st.markdown('<div class="global-menu-panel">', unsafe_allow_html=True)
         with st.container(border=True):
             st.caption(f"Navegacao global - pagina atual: {st.session_state.get('page_label', '📂 Módulos')}")
             items = list(NAV_MENU.items())
@@ -812,6 +814,7 @@ def render_topbar() -> None:
                         if st.button(label, key=f"global_menu_{page}", type=button_type):
                             st.session_state["global_menu_open"] = False
                             navigate_to_page(page, label)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def navigate_to_page(page: str, page_label: str | None = None) -> None:
