@@ -1417,6 +1417,8 @@ def _set_auth_persistence(token: str) -> None:
 
 
 def _restore_persistent_auth_session() -> bool:
+    if st.session_state.get("authenticated") or st.session_state.get("is_authenticated"):
+        return False
     ensure_auth_sessions_table()
     token = _get_auth_token_from_cookie() or _get_auth_token_from_query()
     if not token:
@@ -2775,6 +2777,8 @@ def configured_users() -> dict[str, str]:
 
 def require_login() -> bool:
     ensure_auth_sessions_table()
+    if st.session_state.get("authenticated") or st.session_state.get("is_authenticated"):
+        return True
     if _restore_persistent_auth_session():
         return True
     users = configured_users()
