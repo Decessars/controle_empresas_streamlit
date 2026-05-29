@@ -1512,7 +1512,7 @@ def require_login() -> bool:
 
     if st.session_state.get("authenticated"):
         if "page_label" not in st.session_state:
-            st.session_state["page_label"] = "Modulos"
+            st.session_state["page_label"] = "📂 Módulos"
         if "page" not in st.session_state:
             st.session_state["page"] = "Modulos"
         with st.sidebar:
@@ -1542,7 +1542,7 @@ def require_login() -> bool:
         if users.get(user) == password:
             st.session_state["authenticated"] = True
             st.session_state["auth_user"] = user
-            st.session_state["page_label"] = "Modulos"
+            st.session_state["page_label"] = "📂 Módulos"
             st.session_state["page"] = "Modulos"
             st.query_params["page"] = "Modulos"
             st.rerun()
@@ -1553,22 +1553,22 @@ def require_login() -> bool:
 
 def render_sidebar() -> tuple[str, str]:
     menu_map = {
-        "Modulos": "Modulos",
-        "Painel": "Painel",
-        "Novo Cliente": "Novo Cliente",
-        "Empresas": "Empresas",
-        "Demandas": "Demandas",
-        "Automacao": "Automacao",
-        "Faturamento": "Faturamento MEI",
-        "Backup": "Backup",
+        "📂 Módulos": "Modulos",
+        "📊 Painel": "Painel",
+        "👤 Novo Cliente": "Novo Cliente",
+        "🏢 Empresas": "Empresas",
+        "📋 Demandas": "Demandas",
+        "🤖 Automação": "Automacao",
+        "💰 Faturamento": "Faturamento MEI",
+        "💾 Backup": "Backup",
     }
     menu_items = list(menu_map.keys())
     requested_page = st.query_params.get("page", "Modulos")
-    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "Modulos")
+    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "📂 Módulos")
     if requested_label not in menu_items:
-        requested_label = st.session_state.get("page_label", "Modulos")
+        requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_items:
-        requested_label = "Modulos"
+        requested_label = "📂 Módulos"
     page_label = st.sidebar.radio("Menu", menu_items, index=menu_items.index(requested_label))
     page = menu_map[page_label]
     st.session_state["page_label"] = page_label
