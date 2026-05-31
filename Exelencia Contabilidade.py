@@ -40,6 +40,7 @@ AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
 _ENGINE = None
+_ENGINE_URL = None
 
 USER_ROLES = {
     "admin_geral": "Administrador Geral",
@@ -447,79 +448,98 @@ def apply_nexus_theme() -> None:
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
             color: var(--nexus-text);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 900;
             text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
         .login-mark {
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
             display: inline-grid;
             place-items: center;
-            border-radius: 8px;
-            background: #5b21b6;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 48%, #4f46e5 100%);
             color: #fff;
-            box-shadow: 0 12px 24px rgba(86,0,178,.28);
+            box-shadow: 0 14px 28px rgba(91,33,182,.28);
         }
         .login-title {
-            font-size: 30px;
-            line-height: 1.1;
+            font-size: 28px;
+            line-height: 1.06;
             font-weight: 900;
             color: var(--nexus-text);
-            margin: 0 0 8px 0;
+            margin: 0 0 6px 0;
+            letter-spacing: -0.03em;
         }
         .login-subtitle {
             color: var(--nexus-muted);
-            font-size: 14px;
-            margin-bottom: 22px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            max-width: 34ch;
         }
         .st-key-login_card {
-            width: min(460px, calc(100vw - 48px));
-            margin: 7vh auto 0 auto;
-            background: #ffffff;
-            border: 2px solid rgba(91,33,182,.32);
-            outline: 1px solid rgba(91,33,182,.08);
-            border-radius: 14px;
-            padding: 24px 24px 20px;
-            box-shadow: 0 18px 44px rgba(15,23,42,.10);
+            width: min(392px, calc(100vw - 32px));
+            margin: 8vh auto 0 auto;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(248,250,255,.98) 100%);
+            border: 1px solid rgba(91,33,182,.18);
+            outline: 1px solid rgba(91,33,182,.06);
+            border-radius: 22px;
+            padding: 20px 20px 18px;
+            box-shadow:
+                0 24px 60px rgba(15,23,42,.12),
+                0 2px 0 rgba(255,255,255,.75) inset;
         }
         .st-key-login_card div[data-testid="stForm"] {
             border: 0;
             padding: 0;
         }
         .st-key-login_card input {
-            min-height: 42px;
+            min-height: 40px;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"] {
-            margin-bottom: 0.45rem;
+            margin-bottom: 0.35rem;
             background: #ffffff !important;
-            border: 1px solid rgba(91,33,182,.24) !important;
-            border-radius: 10px !important;
+            border: 1px solid rgba(91,33,182,.18) !important;
+            border-radius: 12px !important;
             box-shadow: 0 1px 0 rgba(15,23,42,.03) inset;
-            padding: 0.15rem 0.4rem !important;
+            padding: 0.08rem 0.3rem !important;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"]:focus-within {
-            border-color: rgba(91,33,182,.52) !important;
-            box-shadow: 0 0 0 3px rgba(91,33,182,.10) !important;
+            border-color: rgba(91,33,182,.58) !important;
+            box-shadow: 0 0 0 3px rgba(91,33,182,.12) !important;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"] input {
             background: transparent !important;
             border: 0 !important;
             box-shadow: none !important;
-            padding: 0.35rem 0.35rem !important;
-            min-height: 34px !important;
+            padding: 0.28rem 0.35rem !important;
+            min-height: 30px !important;
         }
         .st-key-login_card label {
-            margin-bottom: 0.2rem !important;
+            margin-bottom: 0.14rem !important;
             font-weight: 700 !important;
             color: var(--nexus-text) !important;
+            font-size: 13px !important;
         }
         .st-key-login_card .stButton > button,
         .st-key-login_card div[data-testid="stFormSubmitButton"] button {
             width: 100%;
             min-height: 42px;
+            border-radius: 12px;
+            border: 0;
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 55%, #4f46e5 100%);
+            color: #fff;
+            box-shadow: 0 16px 28px rgba(91,33,182,.22);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+        .st-key-login_card .stButton > button:hover,
+        .st-key-login_card div[data-testid="stFormSubmitButton"] button:hover {
+            filter: brightness(1.03);
+            transform: translateY(-1px);
         }
         .nexus-brand {
             font-size: 14px;
@@ -1600,7 +1620,6 @@ def remove_active_session() -> None:
 
 
 def load_active_sessions() -> pd.DataFrame:
-    cleanup_active_sessions()
     return query_df(
         """
         SELECT session_id, usuario, COALESCE(page,'') AS page, last_seen, criado_em
@@ -1619,7 +1638,13 @@ def parse_competencia(competencia: str) -> tuple[int, int]:
         return today.year, today.month
 
 
-def database_url() -> str:
+def get_database_url() -> str:
+    try:
+        url = st.secrets.get("DATABASE_URL", "")
+        if url:
+            return str(url)
+    except Exception:
+        pass
     try:
         secrets_database = st.secrets.get("database", {})
         url = secrets_database.get("url", "") if hasattr(secrets_database, "get") else ""
@@ -1630,8 +1655,13 @@ def database_url() -> str:
     return os.getenv("DATABASE_URL", "").strip()
 
 
+def database_url() -> str:
+    return get_database_url()
+
+
 def using_postgres() -> bool:
-    return bool(database_url())
+    url = get_database_url()
+    return url.startswith(("postgresql://", "postgres://"))
 
 
 def db_label() -> str:
@@ -1645,10 +1675,33 @@ def db_exists() -> bool:
 
 
 def get_engine():
-    global _ENGINE
-    if _ENGINE is None:
-        _ENGINE = create_engine(database_url(), pool_pre_ping=True)
+    global _ENGINE, _ENGINE_URL
+    url = get_database_url()
+    engine_url = url or f"sqlite:///{DB_PATH}"
+    if _ENGINE is None or _ENGINE_URL != engine_url:
+        if url:
+            connect_args = {"sslmode": "require"} if url.startswith(("postgresql://", "postgres://")) else {}
+            _ENGINE = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_recycle=300,
+                connect_args=connect_args,
+            )
+        else:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            _ENGINE = create_engine(
+                f"sqlite:///{DB_PATH}",
+                connect_args={"check_same_thread": False},
+            )
+        _ENGINE_URL = engine_url
     return _ENGINE
+
+
+def test_database_connection() -> bool:
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT 1"))
+        return result.scalar() == 1
 
 
 def get_sqlite_conn() -> sqlite3.Connection:
@@ -1819,6 +1872,17 @@ def init_db() -> None:
             )
             """
         )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id SERIAL PRIMARY KEY,
+                usuario TEXT,
+                acao TEXT,
+                detalhe TEXT,
+                criado_em TEXT
+            )
+            """
+        )
     else:
         with get_sqlite_conn() as conn:
             conn.execute(
@@ -1925,6 +1989,17 @@ def init_db() -> None:
             )
             """
             )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario TEXT,
+                acao TEXT,
+                detalhe TEXT,
+                criado_em TEXT
+            )
+            """
+            )
     ensure_column("empresas", "mensalidade", "TEXT")
     ensure_column("empresas", "cidade", "TEXT")
     ensure_column("empresas", "uf", "TEXT")
@@ -1942,7 +2017,29 @@ def init_db() -> None:
     ensure_column("empresas", "fgts_parc", "INTEGER", "0")
     ensure_column("demandas", "observacao", "TEXT", "''")
     ensure_user_schema()
+    ensure_column("logs_sistema", "usuario", "TEXT")
+    ensure_column("logs_sistema", "acao", "TEXT")
+    ensure_column("logs_sistema", "detalhe", "TEXT")
+    ensure_column("logs_sistema", "criado_em", "TEXT")
+    ensure_database_indexes()
     seed_default_users()
+
+
+def ensure_database_indexes() -> None:
+    index_statements = [
+        "CREATE INDEX IF NOT EXISTS idx_empresas_cnpj ON empresas (cnpj)",
+        "CREATE INDEX IF NOT EXISTS idx_empresas_razao_social ON empresas (razao_social)",
+        "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_competencia ON demandas (competencia)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_id ON demandas (empresa_id)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_tipo ON demandas (tipo)",
+        "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_empresa_id ON faturamento_mei (empresa_id)",
+        "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_competencia ON faturamento_mei (competencia)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_username ON auth_sessions (username)",
+        "CREATE INDEX IF NOT EXISTS idx_active_sessions_usuario ON active_sessions (usuario)",
+    ]
+    for statement in index_statements:
+        execute(statement)
 
 
 def demand_options() -> list[str]:
@@ -2923,15 +3020,21 @@ def render_sidebar() -> tuple[str, str]:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_items:
         requested_label = "📂 Módulos"
+    menu_index = menu_items.index(requested_label)
     with st.sidebar:
         render_company_logo()
-        page_label = st.radio("Menu", menu_items, index=menu_items.index(requested_label))
+        page_label = st.radio("Menu", menu_items, index=menu_index)
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
         st.session_state["page"] = page
         if st.query_params.get("page") != page:
             st.query_params["page"] = page
-        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        saved_competencia = (
+            st.session_state.get("competencia")
+            or st.session_state.get("ultima_competencia")
+            or get_setting("ultima_competencia", current_competencia())
+        )
+        st.session_state["ultima_competencia"] = saved_competencia
         current_year, current_month = parse_competencia(saved_competencia)
         years = list(range(current_year - 5, current_year + 6))
         month_options = [f"{m:02d}" for m in range(1, 13)]
@@ -2940,7 +3043,9 @@ def render_sidebar() -> tuple[str, str]:
         month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"))
         competencia = f"{int(year)}-{month}"
         st.session_state["competencia"] = competencia
-        set_setting("ultima_competencia", competencia)
+        if st.session_state.get("ultima_competencia") != competencia:
+            st.session_state["ultima_competencia"] = competencia
+            set_setting("ultima_competencia", competencia)
         touch_active_session(page)
         active_now = load_active_sessions()
         st.sidebar.caption(f"Usuarios online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
@@ -3097,21 +3202,28 @@ def render_sidebar_secure() -> tuple[str, str]:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_map:
         requested_label = "📂 Módulos"
+    menu_items = list(menu_map.keys())
+    menu_index = menu_items.index(requested_label)
 
     with st.sidebar:
         render_company_logo()
-        active_now = load_active_sessions()
         st.markdown(f"**Usuário:** {current_user_display_name()}")
         st.caption(f"Perfil: {user_role_label(current_user_role())}")
+        active_now = load_active_sessions()
         st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
-        page_label = st.radio("Menu", list(menu_map.keys()), index=list(menu_map.keys()).index(requested_label), key="menu_secure")
+        page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
         st.session_state["page"] = page
         if st.query_params.get("page") != page:
             st.query_params["page"] = page
 
-        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        saved_competencia = (
+            st.session_state.get("competencia")
+            or st.session_state.get("ultima_competencia")
+            or get_setting("ultima_competencia", current_competencia())
+        )
+        st.session_state["ultima_competencia"] = saved_competencia
         current_year, current_month = parse_competencia(saved_competencia)
         years = list(range(current_year - 5, current_year + 6))
         month_options = [f"{m:02d}" for m in range(1, 13)]
@@ -3120,7 +3232,9 @@ def render_sidebar_secure() -> tuple[str, str]:
         month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"), key="mes_secure")
         competencia = f"{int(year)}-{month}"
         st.session_state["competencia"] = competencia
-        set_setting("ultima_competencia", competencia)
+        if st.session_state.get("ultima_competencia") != competencia:
+            st.session_state["ultima_competencia"] = competencia
+            set_setting("ultima_competencia", competencia)
         touch_active_session(page)
         active_now = load_active_sessions()
         st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
