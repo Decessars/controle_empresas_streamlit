@@ -5962,7 +5962,6 @@ def render_modulos() -> None:
                     f"""
                     <div class="module-card{disabled_class}">
                         <div class="module-head">
-                            <span class="module-icon">{item['icon']}</span>
                             <span class="module-title">{item['title']}</span>
                             <span class="module-tag">{item['tag']}</span>
                         </div>
@@ -7891,7 +7890,7 @@ def render_painel(competencia: str) -> None:
             st.markdown(
                 f"""
                 <div style="border:1px solid rgba(148,163,184,.22); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,.68);">
-                    <div style="font-weight:800; margin-bottom:4px;">{item['icon']} {item['title']}</div>
+                    <div style="font-weight:800; margin-bottom:4px;">{item['title']}</div>
                     <div style="font-size:0.9rem; opacity:0.82; margin-bottom:8px;">{item['desc']}</div>
                     <div style="font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{item['tag']}</div>
                 </div>
