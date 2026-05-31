@@ -1338,7 +1338,7 @@ def navigate_to(page: str, label: str | None = None, push_history: bool = True) 
         label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == page), page)
     st.session_state["page"] = page
     st.session_state["page_label"] = label
-    st.session_state["menu_secure"] = label
+    st.session_state["_nav_override_page"] = page
     st.query_params["page"] = page
     st.rerun()
 
@@ -1355,7 +1355,7 @@ def set_navigation_target(page: str, label: str | None = None, push_history: boo
         label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == page), page)
     st.session_state["page"] = page
     st.session_state["page_label"] = label
-    st.session_state["menu_secure"] = label
+    st.session_state["_nav_override_page"] = page
     st.query_params["page"] = page
 
 
@@ -7764,7 +7764,8 @@ def render_backup() -> None:
 
 def render_sidebar_secure() -> tuple[str, str]:
     menu_map = dict(NAV_MENU)
-    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Painel")) or "Painel")
+    override_page = st.session_state.pop("_nav_override_page", None)
+    requested_page = normalize_page(override_page or st.query_params.get("page", st.session_state.get("page", "Painel")) or "Painel")
     if requested_page not in set(menu_map.values()):
         requested_page = "Painel"
         st.query_params["page"] = "Painel"
@@ -7774,6 +7775,8 @@ def render_sidebar_secure() -> tuple[str, str]:
     requested_label = next((label for label, page in menu_map.items() if page == requested_page), "Home")
     menu_items = list(menu_map.keys())
     menu_index = menu_items.index(requested_label) if requested_label in menu_items else 0
+    if override_page and "menu_secure" in st.session_state:
+        del st.session_state["menu_secure"]
 
     with st.sidebar:
         render_company_logo(72)
