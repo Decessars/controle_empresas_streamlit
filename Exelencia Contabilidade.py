@@ -234,11 +234,11 @@ def apply_nexus_theme() -> None:
             margin-bottom: 0.65rem !important;
         }
         div[data-testid="stVerticalBlockBorderWrapper"] > div {
-            padding-top: 0.45rem !important;
-            padding-bottom: 0.45rem !important;
+            padding-top: 0.2rem !important;
+            padding-bottom: 0.2rem !important;
         }
         section[data-testid="stSidebar"] .element-container {
-            margin-bottom: 0.06rem !important;
+            margin-bottom: 0.02rem !important;
         }
         section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
             margin-bottom: 0 !important;
@@ -259,14 +259,14 @@ def apply_nexus_theme() -> None:
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 4px 2px 6px 2px;
+            padding: 0 2px 2px 2px;
         }
         .sidebar-logo img {
-            max-width: 88px !important;
+            max-width: 76px !important;
             height: auto !important;
             object-fit: contain !important;
             display: block;
-            margin: 0 auto 4px auto;
+            margin: 0 auto 1px auto;
         }
         section[data-testid="stSidebar"] {
             background:
@@ -423,6 +423,10 @@ def apply_nexus_theme() -> None:
             min-height: 1.9rem !important;
             padding: 0.18rem 0.48rem !important;
             font-size: 0.88rem !important;
+        }
+        div[data-testid="stSidebar"] .stSelectbox,
+        div[data-testid="stSidebar"] .stRadio {
+            margin-bottom: 0.05rem !important;
         }
         div[data-testid="stSidebar"] [data-testid="stRadio"] {
             margin-top: 0.05rem !important;
@@ -3354,10 +3358,6 @@ def render_sidebar_secure() -> tuple[str, str]:
             f"<div style='margin:0 0 0.08rem 0; line-height:1; color:var(--nexus-muted); font-size:0.88rem;'>Perfil: {user_role_label(current_user_role())}</div>",
             unsafe_allow_html=True,
         )
-        if st.button("Sair", key="logout_secure", help="Sair do sistema"):
-            remove_active_session()
-            _logout_authenticated_session()
-            st.rerun()
         page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
