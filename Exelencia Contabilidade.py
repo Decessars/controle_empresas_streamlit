@@ -40,6 +40,7 @@ AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
 _ENGINE = None
+_ENGINE_URL = None
 
 USER_ROLES = {
     "admin_geral": "Administrador Geral",
@@ -1637,7 +1638,13 @@ def parse_competencia(competencia: str) -> tuple[int, int]:
         return today.year, today.month
 
 
-def database_url() -> str:
+def get_database_url() -> str:
+    try:
+        url = st.secrets.get("DATABASE_URL", "")
+        if url:
+            return str(url)
+    except Exception:
+        pass
     try:
         secrets_database = st.secrets.get("database", {})
         url = secrets_database.get("url", "") if hasattr(secrets_database, "get") else ""
@@ -1648,8 +1655,13 @@ def database_url() -> str:
     return os.getenv("DATABASE_URL", "").strip()
 
 
+def database_url() -> str:
+    return get_database_url()
+
+
 def using_postgres() -> bool:
-    return bool(database_url())
+    url = get_database_url()
+    return url.startswith(("postgresql://", "postgres://"))
 
 
 def db_label() -> str:
@@ -1663,10 +1675,33 @@ def db_exists() -> bool:
 
 
 def get_engine():
-    global _ENGINE
-    if _ENGINE is None:
-        _ENGINE = create_engine(database_url(), pool_pre_ping=True)
+    global _ENGINE, _ENGINE_URL
+    url = get_database_url()
+    engine_url = url or f"sqlite:///{DB_PATH}"
+    if _ENGINE is None or _ENGINE_URL != engine_url:
+        if url:
+            connect_args = {"sslmode": "require"} if url.startswith(("postgresql://", "postgres://")) else {}
+            _ENGINE = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_recycle=300,
+                connect_args=connect_args,
+            )
+        else:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            _ENGINE = create_engine(
+                f"sqlite:///{DB_PATH}",
+                connect_args={"check_same_thread": False},
+            )
+        _ENGINE_URL = engine_url
     return _ENGINE
+
+
+def test_database_connection() -> bool:
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT 1"))
+        return result.scalar() == 1
 
 
 def get_sqlite_conn() -> sqlite3.Connection:
@@ -1837,6 +1872,17 @@ def init_db() -> None:
             )
             """
         )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id SERIAL PRIMARY KEY,
+                usuario TEXT,
+                acao TEXT,
+                detalhe TEXT,
+                criado_em TEXT
+            )
+            """
+        )
     else:
         with get_sqlite_conn() as conn:
             conn.execute(
@@ -1943,6 +1989,17 @@ def init_db() -> None:
             )
             """
             )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS logs_sistema (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario TEXT,
+                acao TEXT,
+                detalhe TEXT,
+                criado_em TEXT
+            )
+            """
+            )
     ensure_column("empresas", "mensalidade", "TEXT")
     ensure_column("empresas", "cidade", "TEXT")
     ensure_column("empresas", "uf", "TEXT")
@@ -1960,7 +2017,29 @@ def init_db() -> None:
     ensure_column("empresas", "fgts_parc", "INTEGER", "0")
     ensure_column("demandas", "observacao", "TEXT", "''")
     ensure_user_schema()
+    ensure_column("logs_sistema", "usuario", "TEXT")
+    ensure_column("logs_sistema", "acao", "TEXT")
+    ensure_column("logs_sistema", "detalhe", "TEXT")
+    ensure_column("logs_sistema", "criado_em", "TEXT")
+    ensure_database_indexes()
     seed_default_users()
+
+
+def ensure_database_indexes() -> None:
+    index_statements = [
+        "CREATE INDEX IF NOT EXISTS idx_empresas_cnpj ON empresas (cnpj)",
+        "CREATE INDEX IF NOT EXISTS idx_empresas_razao_social ON empresas (razao_social)",
+        "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_competencia ON demandas (competencia)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_id ON demandas (empresa_id)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_tipo ON demandas (tipo)",
+        "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_empresa_id ON faturamento_mei (empresa_id)",
+        "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_competencia ON faturamento_mei (competencia)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_username ON auth_sessions (username)",
+        "CREATE INDEX IF NOT EXISTS idx_active_sessions_usuario ON active_sessions (usuario)",
+    ]
+    for statement in index_statements:
+        execute(statement)
 
 
 def demand_options() -> list[str]:
