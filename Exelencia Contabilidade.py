@@ -446,7 +446,7 @@ def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_pa
     competencia = f1.text_input("Competencia", value=competencia_padrao)
     busca = f2.text_input("Buscar", placeholder="cliente, CNPJ, tipo")
     status = f3.selectbox("Status", ["Todos", "pendente", "em_andamento", "concluida"])
-    minhas = f4.checkbox("So minhas", value=False)
+    minhas = f4.checkbox("So minhas", value=not is_admin())
 
     if competencia:
         df = df[df["competencia"].astype(str).eq(competencia)].copy()
