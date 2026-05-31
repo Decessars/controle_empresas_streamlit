@@ -7899,11 +7899,18 @@ def render_painel(competencia: str) -> None:
         st.rerun()
 
 
-def render_continuous_table(df: pd.DataFrame) -> None:
+def render_continuous_table(df: pd.DataFrame, column_widths: dict[str, str] | None = None) -> None:
     if df.empty:
         st.info("Nenhum registro encontrado.")
         return
+    colgroup = ""
+    if column_widths:
+        colgroup = "<colgroup>" + "".join(
+            f"<col style=\"width:{column_widths.get(str(col), 'auto')};\">" for col in df.columns
+        ) + "</colgroup>"
     table_html = df.fillna("").to_html(index=False, escape=True, classes="continuous-table")
+    if colgroup:
+        table_html = table_html.replace(">\n  <thead>", f">\n  {colgroup}\n  <thead>", 1)
     st.markdown(
         f"""
         <style>
@@ -7911,22 +7918,23 @@ def render_continuous_table(df: pd.DataFrame) -> None:
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
-            font-size: 0.78rem;
+            font-size: 0.76rem;
             line-height: 1.25;
         }}
         .continuous-table th,
         .continuous-table td {{
             border: 1px solid rgba(15, 23, 42, 0.10);
-            padding: 0.38rem 0.44rem;
+            padding: 0.42rem 0.48rem;
             vertical-align: top;
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: normal;
         }}
         .continuous-table th {{
-            background: rgba(91, 33, 182, 0.10);
+            background: #7c3aed;
             color: #0f172a;
             font-weight: 800;
+            color: #ffffff;
         }}
         .continuous-table tbody tr:nth-child(even) {{
             background: rgba(241, 245, 249, 0.72);
@@ -8039,12 +8047,28 @@ def render_demandas(competencia: str) -> None:
         st.info("Nenhuma demanda encontrada com os filtros atuais.")
         return
 
-    view_cols = [
-        "demanda_id", "empresa", "tipo_demanda", "responsavel_operacional",
-        "estagiario_responsavel", "status", "data_limite", "bloqueada", "motivo_bloqueio",
-        "observacao", "concluida_em", "concluida_por", "atualizado_em",
-    ]
-    render_continuous_table(demandas[view_cols])
+    grid_df = demandas.rename(
+        columns={
+            "demanda_id": "ID",
+            "empresa": "Cliente",
+            "cnpj": "CNPJ",
+            "tipo_demanda": "Tipo",
+            "competencia": "Competencia",
+            "observacao": "Observacao",
+        }
+    )
+    view_cols = ["ID", "Cliente", "CNPJ", "Tipo", "Competencia", "Observacao"]
+    render_continuous_table(
+        grid_df[view_cols],
+        {
+            "ID": "7%",
+            "Cliente": "20%",
+            "CNPJ": "17%",
+            "Tipo": "26%",
+            "Competencia": "12%",
+            "Observacao": "18%",
+        },
+    )
 
     selected_id = st.selectbox(
         "Selecionar demanda",
