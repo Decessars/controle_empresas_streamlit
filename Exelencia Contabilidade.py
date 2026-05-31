@@ -5,6 +5,7 @@ import csv
 import hashlib
 import hmac
 import json
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -55,14 +56,26 @@ def inject_css() -> None:
         div.stButton > button {
             width: 100%;
             border-radius: 8px;
-            min-height: 42px;
+            min-height: 46px;
             font-weight: 800;
-            border: 1px solid #d7deea;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        }
+        div.stButton > button:hover {
+            transform: translateY(-1px);
+            border-color: var(--primary);
+            box-shadow: 0 14px 30px rgba(109, 40, 217, 0.16);
         }
         div.stButton > button[kind="primary"] {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary), var(--primary-strong));
             border-color: var(--primary);
             color: #fff;
+        }
+        .nav-button-row div.stButton > button {
+            min-height: 58px;
+            font-size: 1.02rem;
         }
         .simple-top {
             display: flex;
@@ -121,6 +134,13 @@ def inject_css() -> None:
         }
         .metric-card span { color: var(--muted); font-size: .82rem; }
         .metric-card strong { display:block; font-size:1.7rem; margin-top:4px; }
+        .action-panel {
+            margin-top: 14px;
+            background: #ffffff;
+            border: 1px solid #dbe3ee;
+            border-radius: 8px;
+            padding: 14px;
+        }
         @media (max-width: 900px) {
             .metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .dmls-table { font-size: 0.70rem; }
@@ -264,11 +284,31 @@ def header(title: str, subtitle: str = "") -> None:
 
 def home() -> None:
     header("Controle de Empresas", "Painel simples para empresas e demandas.")
+    st.markdown('<div class="nav-button-row">', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     if c1.button("Cadastro de Empresas", key="home_empresas"):
         go("empresas")
     if c2.button("Controle de Demandas", key="home_demandas", type="primary"):
         go("demandas")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def sort_controls(df: pd.DataFrame, columns: list[str], key_prefix: str) -> pd.DataFrame:
+    if df.empty:
+        return df
+    c1, c2 = st.columns([1.4, 0.8])
+    sort_col = c1.selectbox("Classificar por", columns, key=f"{key_prefix}_sort_col")
+    sort_dir = c2.selectbox("Ordem", ["A-Z", "Z-A"], key=f"{key_prefix}_sort_dir")
+    ascending = sort_dir != "Z-A"
+    sort_series = df[sort_col].fillna("").astype(str).map(
+        lambda value: unicodedata.normalize("NFKD", value).casefold()
+    )
+    return (
+        df.assign(_sort_key=sort_series)
+        .sort_values("_sort_key", ascending=ascending, kind="mergesort")
+        .drop(columns=["_sort_key"])
+        .reset_index(drop=True)
+    )
 
 
 def render_table(df: pd.DataFrame, widths: dict[str, str]) -> None:
@@ -313,6 +353,7 @@ def empresas_page(empresas: pd.DataFrame) -> None:
         "uf": "UF",
     }
     view = df[[c for c in cols if c in df.columns]].rename(columns=cols)
+    view = sort_controls(view, list(view.columns), "empresas")
     render_table(view, {"ID": "7%", "CNPJ": "18%", "Cliente": "22%", "Razao Social": "31%", "Regime": "12%", "Cidade": "8%", "UF": "2%"})
 
 
@@ -415,8 +456,10 @@ def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_pa
             "observacao": "Observacao",
         }
     )[["ID", "Cliente", "CNPJ", "Tipo", "Competencia", "Observacao"]]
+    grid = sort_controls(grid, list(grid.columns), "demandas")
     render_table(grid, {"ID": "7%", "Cliente": "22%", "CNPJ": "18%", "Tipo": "29%", "Competencia": "10%", "Observacao": "14%"})
 
+    st.markdown('<div class="action-panel">', unsafe_allow_html=True)
     selected_id = st.selectbox(
         "Selecionar demanda para marcar",
         df["demanda_id"].astype(str).tolist(),
@@ -435,6 +478,7 @@ def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_pa
     if c2.button("Em andamento", disabled=not allowed):
         append_marcacao(str(selected_id), "em_andamento", obs)
         st.success("Marcacao registrada.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main() -> None:
