@@ -1,0 +1,69 @@
+RELATORIO DE LIMPEZA - controle_empresas_streamlit
+
+Data/hora: 2026-05-31 14:33
+
+Arquivos mantidos:
+- Exelencia Contabilidade.py
+- requirements.txt
+- .gitignore
+- logo.png
+- README.md
+- ARQUITETURA_PROJETO.md
+- PARIDADE_DESKTOP_WEB.md
+- .env.example
+- Iniciar Controle Web.bat
+- Copiar banco local.bat
+- Migrar banco para PostgreSQL.bat
+- Abrir Controle Web Local.url
+- data_web/README_DATA_WEB.md
+- data_web/empresas_web.csv
+- data_web/demandas_web.csv
+- data_web/usuarios_web.csv
+- data_web/metadata_web.json
+- scripts/copiar_banco_local.ps1
+- scripts/migrar_sqlite_para_postgres.py
+- scripts/migrate_sqlite_to_supabase.py
+
+Arquivos movidos para backup:
+- streamlit_out.log
+- streamlit_err.log
+- streamlit_supabase_out.log
+- streamlit_supabase_err.log
+- streamlit_verify_out.log
+- streamlit_verify_err.log
+- usuarios_senhas.txt
+- __pycache__/
+- scripts/__pycache__/
+- desktop.ini e copias de desktop.ini encontradas na pasta de trabalho
+
+Pastas de backup criadas:
+- _backup_limpeza_20260531_142506
+- _backup_limpeza_20260531_142520
+
+Arquivos ignorados pelo Git:
+- .streamlit/secrets.toml
+- .env
+- *.log
+- __pycache__/
+- *.pyc
+- _backup*/
+- _backup_limpeza*/
+- usuarios_senhas.txt
+- data_web/*.sqlite
+- data_web/*.db
+- data_web/web_action_log.csv
+- data_web/marcacoes_web.csv
+- data_web/backup_exports/
+
+Arquivos sensiveis encontrados:
+- .streamlit/secrets.toml
+- usuarios_senhas.txt
+- data_web/marcacoes_web.csv
+- data_web/web_action_log.csv
+
+Observacoes:
+- A base oficial da Web agora e `data_web/`.
+- O exportador do Python gera `empresas_web.csv`, `demandas_web.csv`, `usuarios_web.csv` e `metadata_web.json`.
+- `marcacoes_web.csv` e `web_action_log.csv` ficam locais/ignorados para evitar exposicao desnecessaria.
+- Se o repositorio for publico, nao suba dados reais de clientes.
+- Se o repositorio for privado, ainda assim evite senhas, tokens e arquivos sensiveis.

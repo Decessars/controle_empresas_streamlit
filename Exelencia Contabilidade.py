@@ -117,53 +117,52 @@ REGIMES = ["Simples Nacional", "MEI", "Lucro Presumido", "Lucro Real", "Imune/Is
 
 MODULES = [
     {
-        "title": "Cadastro de Clientes",
-        "desc": "Tela moderna para visualizar todos os clientes e editar cadastro com agilidade.",
-        "tag": "CADASTRO",
-        "icon": "C",
+        "title": "Painel / Home",
+        "desc": "Resumo rapido da competencia atual, indicadores e atalho para as demandas.",
+        "tag": "ATIVO",
+        "icon": "H",
+        "enabled": True,
+        "page": "Painel",
+    },
+    {
+        "title": "Cadastro de Empresas",
+        "desc": "Lista compacta de empresas para consulta e referencia operacional.",
+        "tag": "ATIVO",
+        "icon": "E",
         "enabled": True,
         "page": "Empresas",
     },
     {
-        "title": "Demandas Mensais",
-        "desc": "Checklist operacional por competencia com marcacao rapida.",
-        "tag": "NOVO",
+        "title": "Controle de Demandas",
+        "desc": "Painel simples para consulta, filtro e marcacao das demandas.",
+        "tag": "ATIVO",
         "icon": "D",
         "enabled": True,
         "page": "Demandas",
     },
     {
-        "title": "Automacao",
-        "desc": "Painel com acoes fiscais rapidas e atalhos para rotinas operacionais.",
-        "tag": "NOVO",
+        "title": "Automação",
+        "desc": "Funcionalidade futura. Nesta fase o painel web nao replica automacoes.",
+        "tag": "EM BREVE",
         "icon": "A",
-        "enabled": True,
+        "enabled": False,
         "page": "Automacao",
     },
     {
-        "title": "Controle de Faturamento",
-        "desc": "Lancamento manual mensal do faturamento MEI com alerta de limite anual.",
-        "tag": "MEI",
-        "icon": "F",
-        "enabled": False,
-        "page": "Faturamento",
-    },
-    {
-        "title": "Relatorios Inteligentes",
-        "desc": "Slot reservado para insights e exportacoes avancadas.",
+        "title": "Relatórios",
+        "desc": "Funcionalidade futura. O foco atual e apenas empresas e demandas.",
         "tag": "EM BREVE",
         "icon": "R",
         "enabled": False,
         "page": "Relatorios",
     },
     {
-        "title": "Painel de Controle 2026",
-        "desc": "Abrir o sistema principal de empresas, demandas e operacoes.",
-        "tag": "PRINCIPAL",
-        "icon": "P",
-        "enabled": True,
-        "featured": True,
-        "page": "Painel",
+        "title": "Backup / Integrações",
+        "desc": "Area reservada para sincronias e rotinas futuras.",
+        "tag": "EM BREVE",
+        "icon": "B",
+        "enabled": False,
+        "page": "Backup",
     },
 ]
 
@@ -199,6 +198,438 @@ BUTTON_LABELS = {
     "faturamento": "💰 Faturamento",
     "automacao": "🤖 Automação",
 }
+
+
+WEB_DATA_DIR = APP_DIR / "data_web"
+WEB_DATA_SQLITE_PATH = WEB_DATA_DIR / "dmls_web.sqlite"
+WEB_EMPRESAS_CSV_PATH = WEB_DATA_DIR / "empresas_web.csv"
+WEB_DEMANDAS_CSV_PATH = WEB_DATA_DIR / "demandas_web.csv"
+WEB_USUARIOS_CSV_PATH = WEB_DATA_DIR / "usuarios_web.csv"
+WEB_MARCACOES_CSV_PATH = WEB_DATA_DIR / "marcacoes_web.csv"
+WEB_ACTION_LOG_CSV_PATH = WEB_DATA_DIR / "web_action_log.csv"
+WEB_DATA_SOURCE_MODES = {"sqlite_local", "excel_snapshot", "csv_snapshot", "supabase"}
+
+NAV_MENU = {
+    "Home": "Painel",
+    "Empresas": "Empresas",
+    "Demandas": "Demandas",
+}
+
+
+def get_data_source_mode() -> str:
+    mode = str(os.getenv("CONTROLE_EMPRESAS_DATA_SOURCE_MODE", "") or "").strip().lower()
+    if not mode:
+        try:
+            mode = str(st.secrets.get("CONTROLE_EMPRESAS_DATA_SOURCE_MODE", "") or "").strip().lower()
+        except Exception:
+            mode = ""
+    if mode not in WEB_DATA_SOURCE_MODES:
+        if (WEB_DATA_DIR / "empresas_web.csv").exists() or (WEB_DATA_DIR / "demandas_web.csv").exists():
+            mode = "csv_snapshot"
+        elif WEB_DATA_SQLITE_PATH.exists():
+            mode = "sqlite_local"
+        else:
+            mode = "csv_snapshot"
+    return mode
+
+
+def is_web_simple_mode() -> bool:
+    return get_data_source_mode() in {"sqlite_local", "excel_snapshot", "csv_snapshot"}
+
+
+@st.cache_data(ttl=60)
+def load_web_data() -> dict[str, pd.DataFrame]:
+    mode = get_data_source_mode()
+    empresas = pd.DataFrame()
+    demandas = pd.DataFrame()
+    usuarios = pd.DataFrame()
+    metadata: dict = {}
+
+    if mode == "sqlite_local" and WEB_DATA_SQLITE_PATH.exists():
+        empresas = _load_web_sqlite_df("empresas_web")
+        demandas = _load_web_sqlite_df("demandas_web")
+        usuarios = _load_web_sqlite_df("usuarios_web")
+    else:
+        empresas = _load_web_csv_or_excel("empresas_web")
+        demandas = _load_web_csv_or_excel("demandas_web")
+        usuarios = _load_web_csv_or_excel("usuarios_web")
+
+    meta_path = WEB_DATA_DIR / "metadata_web.json"
+    if meta_path.exists():
+        try:
+            metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            metadata = {}
+
+    return {
+        "empresas": empresas,
+        "demandas": demandas,
+        "usuarios": usuarios,
+        "metadata": metadata if isinstance(metadata, dict) else {},
+    }
+
+
+def _ensure_web_data_dir() -> Path:
+    WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return WEB_DATA_DIR
+
+
+def _load_web_sqlite_df(table: str) -> pd.DataFrame:
+    if not WEB_DATA_SQLITE_PATH.exists():
+        return pd.DataFrame()
+    try:
+        with sqlite3.connect(str(WEB_DATA_SQLITE_PATH)) as conn:
+            return pd.read_sql_query(f"SELECT * FROM {table}", conn)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _load_web_csv_or_excel(stem: str) -> pd.DataFrame:
+    _ensure_web_data_dir()
+    csv_path = WEB_DATA_DIR / f"{stem}.csv"
+    xlsx_path = WEB_DATA_DIR / f"{stem}.xlsx"
+    if csv_path.exists():
+        try:
+            return pd.read_csv(csv_path)
+        except Exception:
+            return pd.DataFrame()
+    if xlsx_path.exists():
+        try:
+            return pd.read_excel(xlsx_path)
+        except Exception:
+            return pd.DataFrame()
+    return pd.DataFrame()
+
+
+def _append_df_to_csv(path: Path, df: pd.DataFrame) -> None:
+    if df.empty:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = not path.exists()
+    df.to_csv(path, mode="a", index=False, header=header, encoding="utf-8-sig")
+
+
+def _normalize_web_empresas_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=[
+            "empresa_id", "id", "cnpj", "apelido", "razao_social", "nome_fantasia",
+            "regime", "cidade", "uf", "contador_responsavel", "ativo",
+        ])
+    df = df.copy()
+    if "empresa_id" not in df.columns and "id" in df.columns:
+        df["empresa_id"] = df["id"]
+    if "id" not in df.columns and "empresa_id" in df.columns:
+        df["id"] = df["empresa_id"]
+    for col, default in {
+        "cnpj": "",
+        "apelido": "",
+        "razao_social": "",
+        "nome_fantasia": "",
+        "regime": "",
+        "cidade": "",
+        "uf": "",
+        "contador_responsavel": "",
+        "ativo": 1,
+        "atualizado_em": "",
+    }.items():
+        if col not in df.columns:
+            df[col] = default
+    df["empresa_id"] = pd.to_numeric(df["empresa_id"], errors="coerce").fillna(0).astype(int)
+    df["id"] = df["empresa_id"]
+    df["ativo"] = pd.to_numeric(df["ativo"], errors="coerce").fillna(1).astype(int)
+    return df
+
+
+def _normalize_web_demandas_df(df: pd.DataFrame, empresas_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=[
+            "demanda_id", "id", "empresa_id", "empresa", "apelido", "razao_social", "cnpj",
+            "competencia", "tipo_demanda", "descricao", "status", "responsavel_operacional",
+            "estagiario_responsavel", "data_limite", "observacao", "concluida_em", "concluida_por",
+            "percentual_grupo", "bloqueada", "motivo_bloqueio", "atualizado_em",
+        ])
+    df = df.copy()
+    if "demanda_id" not in df.columns and "id" in df.columns:
+        df["demanda_id"] = df["id"]
+    if "id" not in df.columns and "demanda_id" in df.columns:
+        df["id"] = df["demanda_id"]
+    for col in ["empresa_id", "competencia", "tipo_demanda", "descricao", "status", "responsavel_operacional", "estagiario_responsavel", "data_limite", "observacao", "concluida_em", "concluida_por", "motivo_bloqueio", "atualizado_em"]:
+        if col not in df.columns:
+            df[col] = ""
+    if "percentual_grupo" not in df.columns:
+        df["percentual_grupo"] = 0.0
+    if "bloqueada" not in df.columns:
+        df["bloqueada"] = 0
+    df["demanda_id"] = pd.to_numeric(df["demanda_id"], errors="coerce").fillna(0).astype(int)
+    df["id"] = df["demanda_id"]
+    df["empresa_id"] = pd.to_numeric(df["empresa_id"], errors="coerce").fillna(0).astype(int)
+    df["bloqueada"] = pd.to_numeric(df["bloqueada"], errors="coerce").fillna(0).astype(int)
+    if empresas_df is not None and not empresas_df.empty:
+        cols = [c for c in ["empresa_id", "id", "cnpj", "apelido", "razao_social", "nome_fantasia", "regime", "cidade", "uf", "contador_responsavel", "ativo"] if c in empresas_df.columns]
+        emp = empresas_df[cols].copy()
+        if "id" in emp.columns and "empresa_id" not in emp.columns:
+            emp["empresa_id"] = emp["id"]
+        df = df.merge(emp.drop_duplicates("empresa_id"), on="empresa_id", how="left", suffixes=("", "_empresa"))
+    for col, default in {"apelido": "", "razao_social": "", "cnpj": "", "contador_responsavel": ""}.items():
+        if col not in df.columns:
+            df[col] = default
+    df["empresa"] = df.apply(lambda r: str(r.get("apelido") or r.get("razao_social") or "").strip(), axis=1)
+    df["tipo"] = df["tipo_demanda"].fillna("").astype(str)
+    df["status_label"] = df["status"].fillna("").astype(str).str.replace("_", " ").str.title()
+    df["bloqueio"] = df["motivo_bloqueio"].fillna("").astype(str)
+    return df
+
+
+def load_empresas_from_source(active_only: bool = True) -> pd.DataFrame:
+    df = load_web_data()["empresas"].copy()
+    df = _normalize_web_empresas_df(df)
+    if active_only and not df.empty and "ativo" in df.columns:
+        df = df[df["ativo"].astype(int) == 1].copy()
+    if not df.empty:
+        sort_col = "apelido" if "apelido" in df.columns else "razao_social"
+        df = df.sort_values([sort_col, "empresa_id"], na_position="last").reset_index(drop=True)
+    return df
+
+
+def load_usuarios_from_source() -> pd.DataFrame:
+    df = load_web_data()["usuarios"].copy()
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["username", "nome", "perfil", "ativo"])
+    df = df.copy()
+    for col, default in {"username": "", "nome": "", "perfil": "estagiario", "ativo": 1}.items():
+        if col not in df.columns:
+            df[col] = default
+    df["username"] = df["username"].astype(str).str.upper()
+    df["ativo"] = pd.to_numeric(df["ativo"], errors="coerce").fillna(1).astype(int)
+    return df
+
+
+def load_demandas_from_source(competencia: str, filtros: dict | None = None) -> pd.DataFrame:
+    df = load_web_data()["demandas"].copy()
+    empresas_df = load_empresas_from_source(active_only=False)
+    df = _normalize_web_demandas_df(df, empresas_df)
+    if df.empty:
+        return df
+    competencia = str(competencia or "").strip()
+    if competencia:
+        df = df[df["competencia"].astype(str) == competencia].copy()
+    filtros = filtros or {}
+    search = str(filtros.get("busca", "") or "").strip().upper()
+    if search:
+        blob = (
+            df["empresa"].fillna("").astype(str)
+            + " "
+            + df["razao_social"].fillna("").astype(str)
+            + " "
+            + df["cnpj"].fillna("").astype(str)
+            + " "
+            + df["tipo_demanda"].fillna("").astype(str)
+            + " "
+            + df["descricao"].fillna("").astype(str)
+        ).str.upper()
+        df = df[blob.str.contains(search, regex=False)].copy()
+    for key, col in [
+        ("tipo", "tipo_demanda"),
+        ("status", "status"),
+        ("responsavel", "responsavel_operacional"),
+        ("estagiario", "estagiario_responsavel"),
+        ("empresa", "empresa"),
+        ("contador_responsavel", "contador_responsavel"),
+    ]:
+        value = str(filtros.get(key, "") or "").strip()
+        if value and value != "Todos" and col in df.columns:
+            df = df[df[col].fillna("").astype(str) == value].copy()
+    if filtros.get("minhas"):
+        user = normalize_username(current_username())
+        if user:
+            own = (
+                df["responsavel_operacional"].fillna("").astype(str).str.upper().eq(user)
+                | df["estagiario_responsavel"].fillna("").astype(str).str.upper().eq(user)
+            )
+            df = df[own].copy()
+    if filtros.get("mostrar_concluidas") is False:
+        df = df[~df["status"].astype(str).isin(["concluida", "dispensada", "cancelada"])].copy()
+    if filtros.get("atrasadas"):
+        hoje = date.today().isoformat()
+        df["atrasada"] = df.apply(
+            lambda row: bool(str(row.get("data_limite") or "").strip() and str(row.get("data_limite")) < hoje and str(row.get("status")) not in {"concluida", "dispensada", "cancelada"}),
+            axis=1,
+        )
+        df = df[df["atrasada"]].copy()
+    if "percentual_grupo" not in df.columns:
+        df["percentual_grupo"] = df.groupby(["empresa_id", "competencia"])["status"].transform(
+            lambda s: round(100.0 * (s.astype(str) == "concluida").sum() / max(len(s), 1), 2)
+        )
+    if "atrasada" not in df.columns:
+        hoje = date.today().isoformat()
+        df["atrasada"] = df.apply(
+            lambda row: bool(str(row.get("data_limite") or "").strip() and str(row.get("data_limite")) < hoje and str(row.get("status")) not in {"concluida", "dispensada", "cancelada"}),
+            axis=1,
+        )
+    return df.reset_index(drop=True)
+
+
+def can_user_mark_demanda(username: str, demanda: dict | pd.Series) -> bool:
+    user = normalize_username(username)
+    if not user:
+        return False
+    if is_admin_geral() or is_contador():
+        return True
+    if isinstance(demanda, pd.Series):
+        demanda = demanda.to_dict()
+    if not isinstance(demanda, dict):
+        return False
+    responsavel = normalize_username(demanda.get("estagiario_responsavel") or demanda.get("responsavel_operacional"))
+    return bool(responsavel and responsavel == user)
+
+
+def append_web_action_log(username: str, acao: str, entidade: str = "", entidade_id: int | None = None, detalhe: str = "") -> None:
+    row = pd.DataFrame([{
+        "username": normalize_username(username),
+        "acao": str(acao or "").strip(),
+        "entidade": str(entidade or "").strip(),
+        "entidade_id": int(entidade_id or 0),
+        "detalhe": str(detalhe or "").strip(),
+        "data_hora": datetime.now().isoformat(timespec="seconds"),
+    }])
+    _append_df_to_csv(WEB_ACTION_LOG_CSV_PATH, row)
+    try:
+        _ensure_web_data_dir()
+        with sqlite3.connect(str(WEB_DATA_SQLITE_PATH)) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS logs_web (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT,
+                    acao TEXT NOT NULL,
+                    entidade TEXT,
+                    entidade_id INTEGER DEFAULT 0,
+                    detalhe TEXT,
+                    data_hora TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO logs_web (username, acao, entidade, entidade_id, detalhe, data_hora) VALUES (?, ?, ?, ?, ?, ?)",
+                tuple(row.iloc[0][["username", "acao", "entidade", "entidade_id", "detalhe", "data_hora"]]),
+            )
+            conn.commit()
+    except Exception:
+        pass
+
+
+def save_demanda_status_to_source(demanda_id: int, status: str, observacao: str = "", username: str | None = None) -> None:
+    user = normalize_username(username or current_username() or "WEB")
+    status_norm = str(status or "").strip().lower() or "pendente"
+    observacao = str(observacao or "").strip()
+    now = datetime.now().isoformat(timespec="seconds")
+    _ensure_web_data_dir()
+    try:
+        with sqlite3.connect(str(WEB_DATA_SQLITE_PATH)) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS demandas_web (
+                    demanda_id INTEGER PRIMARY KEY,
+                    empresa_id INTEGER NOT NULL,
+                    competencia TEXT,
+                    tipo_demanda TEXT,
+                    descricao TEXT,
+                    status TEXT,
+                    responsavel_operacional TEXT,
+                    estagiario_responsavel TEXT,
+                    data_limite TEXT,
+                    observacao TEXT,
+                    concluida_em TEXT,
+                    concluida_por TEXT,
+                    percentual_grupo REAL DEFAULT 0,
+                    bloqueada INTEGER DEFAULT 0,
+                    motivo_bloqueio TEXT,
+                    atualizado_em TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS marcacoes_web (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    demanda_id INTEGER NOT NULL,
+                    username TEXT NOT NULL,
+                    acao TEXT NOT NULL,
+                    status_novo TEXT,
+                    observacao TEXT,
+                    data_hora TEXT NOT NULL,
+                    processed INTEGER DEFAULT 0
+                )
+                """
+            )
+            conn.execute(
+                """
+                UPDATE demandas_web
+                   SET status=?,
+                       observacao=CASE WHEN COALESCE(?, '') <> '' THEN ? ELSE observacao END,
+                       concluida_em=CASE WHEN ? = 'concluida' THEN COALESCE(concluida_em, ?) ELSE concluida_em END,
+                       concluida_por=CASE WHEN ? = 'concluida' THEN COALESCE(concluida_por, ?) ELSE concluida_por END,
+                       atualizado_em=?
+                 WHERE demanda_id=?
+                """,
+                (
+                    status_norm,
+                    observacao,
+                    observacao,
+                    status_norm,
+                    now,
+                    status_norm,
+                    user,
+                    now,
+                    int(demanda_id),
+                ),
+            )
+            conn.execute(
+                "INSERT INTO marcacoes_web (demanda_id, username, acao, status_novo, observacao, data_hora, processed) VALUES (?, ?, ?, ?, ?, ?, 0)",
+                (int(demanda_id), user, "status", status_norm, observacao, now),
+            )
+            conn.commit()
+    except Exception:
+        pass
+
+    try:
+        demandas_df = load_web_data()["demandas"].copy()
+        if demandas_df is None or demandas_df.empty:
+            demandas_df = _load_web_csv_or_excel("demandas_web")
+        empresas_df = load_empresas_from_source(active_only=False)
+        demandas_df = _normalize_web_demandas_df(demandas_df, empresas_df)
+        if not demandas_df.empty and "demanda_id" in demandas_df.columns:
+            mask = demandas_df["demanda_id"].astype(int) == int(demanda_id)
+            if mask.any():
+                demandas_df.loc[mask, "status"] = status_norm
+                if observacao:
+                    demandas_df.loc[mask, "observacao"] = observacao
+                if status_norm == "concluida":
+                    demandas_df.loc[mask, "concluida_em"] = now
+                    demandas_df.loc[mask, "concluida_por"] = user
+                demandas_df.loc[mask, "atualizado_em"] = now
+                demandas_df.to_csv(WEB_DEMANDAS_CSV_PATH, index=False, encoding="utf-8-sig")
+    except Exception:
+        pass
+
+    _append_df_to_csv(WEB_MARCACOES_CSV_PATH, pd.DataFrame([{
+        "demanda_id": int(demanda_id),
+        "username": user,
+        "acao": "status",
+        "status_novo": status_norm,
+        "observacao": observacao,
+        "data_hora": now,
+    }]))
+    append_web_action_log(user, "ALTERAR_STATUS", "demandas_web", int(demanda_id), f"status={status_norm}")
+    try:
+        load_web_data.clear()
+    except Exception:
+        pass
+
+
+def render_module_locked(title: str) -> None:
+    st.subheader(title)
+    st.info("Modulo em desenvolvimento. Nesta fase, o sistema Web funciona apenas para Empresas e Demandas.")
 
 
 def apply_nexus_theme() -> None:
@@ -7397,6 +7828,273 @@ def render_backup() -> None:
         st.success("Banco substituido. Recarregue a pagina.")
 
 
+def render_sidebar_secure() -> tuple[str, str]:
+    menu_map = dict(NAV_MENU)
+    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Painel")) or "Painel")
+    if requested_page not in set(menu_map.values()):
+        requested_page = "Painel"
+        st.query_params["page"] = "Painel"
+        st.session_state["page"] = "Painel"
+        st.session_state["page_label"] = "Home"
+
+    requested_label = next((label for label, page in menu_map.items() if page == requested_page), "Home")
+    menu_items = list(menu_map.keys())
+    menu_index = menu_items.index(requested_label) if requested_label in menu_items else 0
+
+    with st.sidebar:
+        render_company_logo(72)
+        st.markdown(
+            f"<div style='margin:0.08rem 0 0.03rem 0; line-height:1.05;'><strong>Usuario:</strong> {current_user_display_name()}</div>"
+            f"<div style='margin:0 0 0.08rem 0; line-height:1; color:var(--nexus-muted); font-size:0.88rem;'>Perfil: {user_role_label(current_user_role())}</div>",
+            unsafe_allow_html=True,
+        )
+        page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
+        page = menu_map[page_label]
+        st.session_state["page_label"] = page_label
+        st.session_state["page"] = page
+        if st.query_params.get("page") != page:
+            st.query_params["page"] = page
+
+        saved_competencia = st.session_state.get("competencia") or st.session_state.get("ultima_competencia") or current_competencia()
+        st.session_state["ultima_competencia"] = saved_competencia
+        current_year, current_month = parse_competencia(saved_competencia)
+        years = list(range(current_year - 5, current_year + 6))
+        month_options = [f"{m:02d}" for m in range(1, 13)]
+        y1, y2 = st.sidebar.columns(2)
+        year = y1.selectbox("Ano", years, index=years.index(current_year), key="ano_secure")
+        month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"), key="mes_secure")
+        competencia = f"{int(year)}-{month}"
+        st.session_state["competencia"] = competencia
+        touch_active_session(page)
+        active_now = load_active_sessions()
+        st.caption(f"Online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
+        if st.button("🔄 Recarregar dados", use_container_width=True):
+            try:
+                load_web_data.clear()
+            except Exception:
+                pass
+            st.rerun()
+    return page, competencia
+
+
+def render_painel(competencia: str) -> None:
+    if not is_web_simple_mode():
+        st.subheader("Painel")
+        st.info("Modo legado habilitado. Use as telas principais para navegar.")
+        return
+
+    st.subheader("Home")
+    st.caption(f"Fonte de dados: {get_data_source_mode()}")
+    empresas = load_empresas_from_source(active_only=False)
+    demandas = load_demandas_from_source(competencia, {})
+    user = normalize_username(current_username())
+    role = current_user_role()
+    minhas_df = demandas[
+        demandas["responsavel_operacional"].fillna("").astype(str).str.upper().eq(user)
+        | demandas["estagiario_responsavel"].fillna("").astype(str).str.upper().eq(user)
+    ].copy() if not demandas.empty and user else demandas.iloc[0:0].copy()
+
+    total = len(demandas)
+    pendentes = int((demandas["status"] == "pendente").sum()) if not demandas.empty else 0
+    concluidas = int((demandas["status"] == "concluida").sum()) if not demandas.empty else 0
+    pct_geral = round(100 * concluidas / total, 0) if total else 0
+    minhas_total = len(minhas_df)
+    minhas_concluidas = int((minhas_df["status"] == "concluida").sum()) if not minhas_df.empty else 0
+    pct_minha = round(100 * minhas_concluidas / minhas_total, 0) if minhas_total else 0
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Competencia", competencia)
+    c2.metric("Total", total)
+    c3.metric("Pendentes", pendentes)
+    c4.metric("Concluidas", concluidas)
+    c5.metric("% Geral", f"{pct_geral:.0f}%")
+
+    st.markdown("##### Modulos")
+    module_cols = st.columns(2)
+    for idx, item in enumerate(MODULES):
+        with module_cols[idx % 2]:
+            st.markdown(
+                f"""
+                <div style="border:1px solid rgba(148,163,184,.22); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:rgba(255,255,255,.68);">
+                    <div style="font-weight:800; margin-bottom:4px;">{item['icon']} {item['title']}</div>
+                    <div style="font-size:0.9rem; opacity:0.82; margin-bottom:8px;">{item['desc']}</div>
+                    <div style="font-size:0.74rem; text-transform:uppercase; letter-spacing:0.04em;">{item['tag']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if item.get("enabled"):
+                if st.button(f"Abrir {item['title']}", key=f"home_mod_{idx}", use_container_width=True):
+                    target = str(item.get("page") or "Painel")
+                    st.session_state["page"] = target
+                    st.query_params["page"] = target
+                    st.rerun()
+            else:
+                st.button("Em breve", key=f"home_mod_disabled_{idx}", use_container_width=True, disabled=True)
+
+    if role == "estagiario":
+        c6, c7, c8 = st.columns(3)
+        c6.metric("Minhas demandas", minhas_total)
+        c7.metric("Minhas concluidas", minhas_concluidas)
+        c8.metric("% Individual", f"{pct_minha:.0f}%")
+    else:
+        grouped = demandas.groupby("responsavel_operacional").size().reset_index(name="qtd") if not demandas.empty else pd.DataFrame()
+        st.markdown("##### Demandas por responsavel")
+        if grouped.empty:
+            st.caption("Sem dados.")
+        else:
+            st.dataframe(grouped, use_container_width=True, hide_index=True)
+
+    b1, b2 = st.columns([1, 1])
+    if b1.button("📋 Abrir Demandas", use_container_width=True, type="primary"):
+        st.session_state["page"] = "Demandas"
+        st.query_params["page"] = "Demandas"
+        st.rerun()
+    if role != "estagiario" and b2.button("🏢 Ver Empresas", use_container_width=True):
+        st.session_state["page"] = "Empresas"
+        st.query_params["page"] = "Empresas"
+        st.rerun()
+
+
+def render_empresas() -> None:
+    if not is_web_simple_mode():
+        render_module_locked("Empresas")
+        return
+
+    st.subheader("Empresas")
+    empresas = load_empresas_from_source(active_only=True)
+    if empresas.empty:
+        st.info("Nenhuma empresa encontrada na base da Web.")
+        return
+
+    c1, c2, c3 = st.columns([1.4, 1, 1])
+    busca = c1.text_input("Buscar", placeholder="CNPJ, apelido ou razao social")
+    contador_filter = c2.selectbox("Responsavel", ["Todos", *sorted(empresas["contador_responsavel"].fillna("").astype(str).str.upper().unique().tolist())], index=0)
+    ativo_filter = c3.selectbox("Status", ["Ativas", "Todas"], index=0)
+
+    filtered = empresas.copy()
+    if busca:
+        q = busca.strip().upper()
+        blob = (
+            filtered["cnpj"].fillna("").astype(str)
+            + " "
+            + filtered["apelido"].fillna("").astype(str)
+            + " "
+            + filtered["razao_social"].fillna("").astype(str)
+            + " "
+            + filtered["nome_fantasia"].fillna("").astype(str)
+        ).str.upper()
+        filtered = filtered[blob.str.contains(q, regex=False)].copy()
+    if contador_filter != "Todos":
+        filtered = filtered[filtered["contador_responsavel"].fillna("").astype(str).str.upper() == contador_filter].copy()
+    if ativo_filter == "Ativas":
+        filtered = filtered[filtered["ativo"].astype(int) == 1].copy()
+
+    cols = ["empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia", "regime", "cidade", "uf", "contador_responsavel", "ativo"]
+    st.dataframe(filtered[cols], use_container_width=True, hide_index=True)
+    st.caption("Cadastro e edicao completa ficam no Python principal.")
+
+
+def render_demandas(competencia: str) -> None:
+    if not is_web_simple_mode():
+        render_module_locked("Demandas")
+        return
+
+    st.subheader("Controle de Demandas")
+    st.caption("Estagiarios veem as demandas de todos, mas so marcam as proprias.")
+
+    empresas = load_empresas_from_source(active_only=False)
+    users_df = load_usuarios_from_source()
+    responsaveis = sorted(
+        set(
+            list(users_df["username"].astype(str).str.upper().tolist()) if not users_df.empty else []
+        )
+    )
+    if current_username() and current_username() not in responsaveis:
+        responsaveis.append(current_username())
+
+    f1, f2, f3, f4 = st.columns([1.05, 1.2, 1, 1])
+    competencia_filtro = f1.text_input("Competencia", value=competencia, key="web_dem_comp")
+    busca = f2.text_input("Buscar", placeholder="empresa, cnpj, tipo", key="web_dem_busca")
+    status_filter = f3.selectbox("Status", ["Todos", *DEMANDA_STATUS], key="web_dem_status")
+    resp_filter = f4.selectbox("Responsavel", ["Todos", *responsaveis], key="web_dem_resp")
+
+    f5, f6, f7, f8 = st.columns([1, 1, 1, 1])
+    empresa_options = ["Todas"] + sorted(set([str(v) for v in empresas["apelido"].fillna("").astype(str).tolist() if str(v).strip()]))
+    empresa_filter = f5.selectbox("Empresa", empresa_options, key="web_dem_empresa")
+    tipos_df = load_demandas_from_source(competencia_filtro, {})
+    tipo_options = ["Todos"] + sorted([t for t in tipos_df["tipo_demanda"].fillna("").astype(str).unique().tolist() if t])
+    tipo_filter = f6.selectbox("Tipo", tipo_options, key="web_dem_tipo")
+    minhas = f7.checkbox("Mostrar so minhas", value=is_estagiario(), key="web_dem_minhas")
+    mostrar_concluidas = f8.checkbox("Mostrar concluidas", value=True, key="web_dem_concluidas")
+
+    filtros = {
+        "busca": busca,
+        "status": "" if status_filter == "Todos" else status_filter,
+        "responsavel": "" if resp_filter == "Todos" else resp_filter,
+        "empresa": "" if empresa_filter == "Todas" else empresa_filter,
+        "tipo": "" if tipo_filter == "Todos" else tipo_filter,
+        "minhas": minhas,
+        "mostrar_concluidas": mostrar_concluidas,
+    }
+    demandas = load_demandas_from_source(competencia_filtro, filtros)
+
+    total = len(demandas)
+    pendentes = int((demandas["status"] == "pendente").sum()) if not demandas.empty else 0
+    concluidas = int((demandas["status"] == "concluida").sum()) if not demandas.empty else 0
+    pct = round(100 * concluidas / total, 0) if total else 0
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total", total)
+    m2.metric("Pendentes", pendentes)
+    m3.metric("Concluidas", concluidas)
+    m4.metric("% concluido", f"{pct:.0f}%")
+
+    if demandas.empty:
+        st.info("Nenhuma demanda encontrada com os filtros atuais.")
+        return
+
+    view_cols = [
+        "demanda_id", "empresa", "tipo_demanda", "responsavel_operacional",
+        "estagiario_responsavel", "status", "data_limite", "bloqueada", "motivo_bloqueio",
+        "observacao", "concluida_em", "concluida_por", "atualizado_em",
+    ]
+    st.dataframe(demandas[view_cols], use_container_width=True, hide_index=True)
+
+    selected_id = st.selectbox(
+        "Selecionar demanda",
+        demandas["demanda_id"].astype(int).tolist(),
+        format_func=lambda did: f"{int(did)} - {demandas.loc[demandas['demanda_id'].astype(int) == int(did), 'empresa'].iloc[0]} | {demandas.loc[demandas['demanda_id'].astype(int) == int(did), 'tipo_demanda'].iloc[0]}",
+        key="web_dem_selected",
+    )
+    row = demandas.loc[demandas["demanda_id"].astype(int) == int(selected_id)].iloc[0].to_dict()
+    locked = bool(int(row.get("bloqueada", 0) or 0))
+    can_mark = can_user_mark_demanda(current_username(), row) and not locked
+    st.markdown("##### Detalhes")
+    cols = st.columns(3)
+    cols[0].write(f"**Empresa:** {row.get('empresa', '')}")
+    cols[1].write(f"**Responsavel:** {row.get('responsavel_operacional', '') or row.get('estagiario_responsavel', '')}")
+    cols[2].write(f"**Status:** {row.get('status', '')}")
+    if locked:
+        st.warning(f"Bloqueada: {row.get('motivo_bloqueio', '')}")
+
+    obs = st.text_area("Observacao curta", value=str(row.get("observacao", "")), key=f"web_obs_{selected_id}", height=90)
+    a1, a2, a3, a4 = st.columns(4)
+    if a1.button("✅ Concluir", disabled=not can_mark, use_container_width=True):
+        save_demanda_status_to_source(int(selected_id), "concluida", obs, current_username())
+        st.rerun()
+    if a2.button("▶️ Em andamento", disabled=not can_mark, use_container_width=True):
+        save_demanda_status_to_source(int(selected_id), "em_andamento", obs, current_username())
+        st.rerun()
+    if a3.button("📝 Salvar observacao", disabled=not can_mark, use_container_width=True):
+        save_demanda_status_to_source(int(selected_id), str(row.get("status", "pendente")), obs, current_username())
+        st.rerun()
+    if a4.button("🔄 Atualizar", use_container_width=True):
+        st.rerun()
+
+    if not can_mark:
+        st.caption("Somente a demanda atribuida ao seu usuario pode ser marcada.")
+
+
 def main() -> None:
     st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="expanded")
     apply_nexus_theme()
@@ -7412,33 +8110,18 @@ def main() -> None:
         render_setup()
         return
 
-    requested_page = normalize_page(st.query_params.get("page", st.session_state.get("page", "Modulos")) or "Modulos")
-    if requested_page == "usuarios" and not can_access_users_page():
-        st.warning("Você não tem permissão para acessar esta área.")
-        st.query_params["page"] = "Modulos"
-        st.session_state["page"] = "Modulos"
-        st.session_state["page_label"] = "📂 Módulos"
-
     page, competencia = render_sidebar_secure()
 
     if page == "Modulos":
         render_modulos()
     elif page == "Painel":
         render_painel(competencia)
-    elif page == "Novo Cliente":
-        render_novo_cliente()
     elif page == "Empresas":
         render_empresas()
     elif page == "Demandas":
         render_demandas(competencia)
-    elif page == "Automacao":
-        render_automacao()
-    elif page in ("Faturamento", "Faturamento MEI"):
-        render_faturamento(competencia)
-    elif page == "Backup":
-        render_backup()
-    elif page == "usuarios":
-        render_usuarios()
+    else:
+        render_module_locked(page)
 
 
 if __name__ == "__main__":
