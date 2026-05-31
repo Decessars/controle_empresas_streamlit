@@ -1732,6 +1732,22 @@ def test_database_connection() -> bool:
         return result.scalar() == 1
 
 
+def database_status_for_login() -> tuple[str, str]:
+    try:
+        total_users = query_df("SELECT COUNT(*) AS total FROM users")
+        users_count = int(total_users.iloc[0]["total"] or 0) if not total_users.empty else 0
+    except Exception:
+        users_count = 0
+    try:
+        if using_postgres() and test_database_connection():
+            return "success", f"Banco: Supabase PostgreSQL conectado | Usuarios: {users_count}"
+        if using_postgres():
+            return "error", "Banco: Supabase PostgreSQL configurado, mas sem conexao"
+        return "warning", f"Banco: SQLite local/temporario | Usuarios: {users_count} | Configure DATABASE_URL nos Secrets"
+    except Exception as exc:
+        return "error", f"Banco: erro de conexao ({type(exc).__name__})"
+
+
 def get_sqlite_conn() -> sqlite3.Connection:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -3191,6 +3207,13 @@ def require_login_secure() -> bool:
             """,
             unsafe_allow_html=True,
         )
+        db_status_kind, db_status_text = database_status_for_login()
+        if db_status_kind == "success":
+            st.success(db_status_text, icon="✅")
+        elif db_status_kind == "warning":
+            st.warning(db_status_text, icon="⚠️")
+        else:
+            st.error(db_status_text, icon="🚫")
         with st.form("login_form_secure"):
             user = st.text_input("Usuario")
             password = st.text_input("Senha", type="password")
