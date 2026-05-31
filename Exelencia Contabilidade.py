@@ -238,13 +238,17 @@ def apply_nexus_theme() -> None:
             padding-bottom: 0.45rem !important;
         }
         section[data-testid="stSidebar"] .element-container {
-            margin-bottom: 0.18rem !important;
+            margin-bottom: 0.06rem !important;
         }
         section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
             margin-bottom: 0 !important;
         }
+        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
         section[data-testid="stSidebar"] hr {
-            margin: 0.28rem 0 !important;
+            margin: 0.12rem 0 !important;
         }
         section[data-testid="stSidebar"] {
             width: 16rem !important;
@@ -416,9 +420,16 @@ def apply_nexus_theme() -> None:
         }
         div[data-testid="stSidebar"] .stButton > button,
         div[data-testid="stSidebar"] .stLinkButton > a {
-            min-height: 2.15rem !important;
-            padding: 0.25rem 0.6rem !important;
-            font-size: 0.92rem !important;
+            min-height: 1.9rem !important;
+            padding: 0.18rem 0.48rem !important;
+            font-size: 0.88rem !important;
+        }
+        div[data-testid="stSidebar"] [data-testid="stRadio"] {
+            margin-top: 0.05rem !important;
+            margin-bottom: 0.05rem !important;
+        }
+        div[data-testid="stSidebar"] [data-testid="stRadio"] label {
+            margin-bottom: 0.02rem !important;
         }
         .top-action-row .stButton > button {
             width: 100% !important;
@@ -3232,13 +3243,6 @@ def require_login_secure() -> bool:
             st.session_state["page_label"] = AUTH_SESSION_DEFAULT_LABEL
         if "page" not in st.session_state:
             st.session_state["page"] = AUTH_SESSION_DEFAULT_PAGE
-        with st.sidebar:
-            st.markdown(f"**Usuário:** {current_user_display_name()}")
-            st.caption(f"Perfil: {user_role_label(current_user_role())}")
-            if st.button("Sair", key="logout_secure", help="Sair do sistema"):
-                remove_active_session()
-                _logout_authenticated_session()
-                st.rerun()
         return True
 
     with st.container(border=True, key="login_card_secure"):
@@ -3344,12 +3348,16 @@ def render_sidebar_secure() -> tuple[str, str]:
     menu_index = menu_items.index(requested_label)
 
     with st.sidebar:
-        render_company_logo()
+        render_company_logo(72)
         st.markdown(
-            f"<div style='margin:0.15rem 0 0.1rem 0; line-height:1.15;'><strong>Usuário:</strong> {current_user_display_name()}</div>"
-            f"<div style='margin:0 0 0.2rem 0; line-height:1.1; color:var(--nexus-muted); font-size:0.92rem;'>Perfil: {user_role_label(current_user_role())}</div>",
+            f"<div style='margin:0.08rem 0 0.03rem 0; line-height:1.05;'><strong>Usuário:</strong> {current_user_display_name()}</div>"
+            f"<div style='margin:0 0 0.08rem 0; line-height:1; color:var(--nexus-muted); font-size:0.88rem;'>Perfil: {user_role_label(current_user_role())}</div>",
             unsafe_allow_html=True,
         )
+        if st.button("Sair", key="logout_secure", help="Sair do sistema"):
+            remove_active_session()
+            _logout_authenticated_session()
+            st.rerun()
         page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
