@@ -5892,52 +5892,12 @@ def render_usuarios() -> None:
 
 
 def render_modulos() -> None:
-    left_pad, content_col, right_pad = st.columns([0.12, 0.76, 0.12])
-    with content_col:
-        st.markdown(
-            """
-            <div class="launcher-shell">
-                <div class="launcher-kicker">Portal Principal | Selecao de modulo</div>
-                <div class="launcher-title">Acesso ao SISTEMA EXCELENCIA CONTABILIDADE</div>
-                <div class="launcher-subtitle">Selecione o ambiente de trabalho para iniciar sua operacao.</div>
-            </div>
-            <div class="launcher-grid-wrap">
-            """,
-            unsafe_allow_html=True,
-        )
-        for start in range(0, len(MODULES), 2):
-            cols = st.columns(2, gap="small")
-            for idx, item in enumerate(MODULES[start:start + 2]):
-                with cols[idx]:
-                    enabled = bool(item.get("enabled"))
-                    safe_key = str(item["title"]).replace(" ", "_").replace("/", "_")
-                    disabled_class = "" if enabled else " disabled"
-                    st.markdown(
-                        f"""
-                        <div class="module-card{disabled_class}">
-                            <div class="module-head">
-                                <span class="module-icon">{item['icon']}</span>
-                                <span class="module-title">{item['title']}</span>
-                                <span class="module-tag">{item['tag']}</span>
-                            </div>
-                            <div class="module-desc">{item['desc']}</div>
-                        </div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    if enabled:
-                        target = normalize_page(str(item["page"]))
-                        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == target), item["title"])
-                        st.button(
-                            "Acessar modulo",
-                            key=f"module_open_{safe_key}",
-                            use_container_width=False,
-                            on_click=set_navigation_target,
-                            args=(target, label),
-                        )
-                    else:
-                        st.button("Disponivel em breve", key=f"module_disabled_{safe_key}", disabled=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.subheader("Modulos")
+    cols = st.columns(2)
+    if cols[0].button("Cadastro de Empresas", key="module_open_empresas_simple", use_container_width=True):
+        set_navigation_target("Empresas", "Empresas")
+    if cols[1].button("Controle de Demandas", key="module_open_demandas_simple", use_container_width=True, type="primary"):
+        set_navigation_target("Demandas", "Demandas")
     return
 
     st.markdown(
@@ -7858,6 +7818,16 @@ def render_painel(competencia: str) -> None:
         return
 
     st.subheader("Home")
+    cols = st.columns(2)
+    if cols[0].button("Cadastro de Empresas", key="home_open_empresas_simple", use_container_width=True):
+        st.session_state["page"] = "Empresas"
+        st.query_params["page"] = "Empresas"
+        st.rerun()
+    if cols[1].button("Controle de Demandas", key="home_open_demandas_simple", use_container_width=True, type="primary"):
+        st.session_state["page"] = "Demandas"
+        st.query_params["page"] = "Demandas"
+        st.rerun()
+    return
     st.caption(f"Fonte de dados: {get_data_source_mode()}")
     empresas = load_empresas_from_source(active_only=False)
     demandas = load_demandas_from_source(competencia, {})
