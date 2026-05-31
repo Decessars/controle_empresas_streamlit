@@ -3241,13 +3241,6 @@ def require_login_secure() -> bool:
             """,
             unsafe_allow_html=True,
         )
-        db_status_kind, db_status_text = database_status_for_login(get_database_url() or str(DB_PATH))
-        if db_status_kind == "success":
-            st.success(db_status_text, icon="✅")
-        elif db_status_kind == "warning":
-            st.warning(db_status_text, icon="⚠️")
-        else:
-            st.error(db_status_text, icon="🚫")
         with st.form("login_form_secure"):
             user = st.text_input("Usuario")
             password = st.text_input("Senha", type="password")
