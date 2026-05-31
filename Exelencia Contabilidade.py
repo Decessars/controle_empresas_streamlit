@@ -7785,8 +7785,8 @@ def render_sidebar_secure() -> tuple[str, str]:
             f"<div style='margin:0 0 0.08rem 0; line-height:1; color:var(--nexus-muted); font-size:0.88rem;'>Perfil: {user_role_label(current_user_role())}</div>",
             unsafe_allow_html=True,
         )
-        page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
-        page = menu_map[page_label]
+        page_label = requested_label
+        page = requested_page
         st.session_state["page_label"] = page_label
         st.session_state["page"] = page
         if st.query_params.get("page") != page:
