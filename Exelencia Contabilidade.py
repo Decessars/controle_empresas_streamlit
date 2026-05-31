@@ -39,7 +39,7 @@ AUTH_SESSION_TTL_SECONDS = 3600
 AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
-SCHEMA_VERSION = "2026-05-30-05"
+SCHEMA_VERSION = "2026-05-30-06"
 _ENGINE = None
 _ENGINE_URL = None
 
@@ -2462,7 +2462,7 @@ def ensure_database_initialized(database_marker: str) -> bool:
 
 
 def ensure_database_ready() -> None:
-    ensure_database_initialized(get_database_url() or str(DB_PATH))
+    ensure_database_initialized(f"{get_database_url() or str(DB_PATH)}::{SCHEMA_VERSION}")
 
 
 def demand_options() -> list[str]:
@@ -3473,29 +3473,37 @@ def load_demanda_tipos(ativos: bool = True) -> pd.DataFrame:
 def ensure_demanda_tipos_padrao() -> None:
     timestamp = now_str()
     for row in DEMAND_TYPE_ROWS:
-        execute(
-            """
-            INSERT INTO demanda_tipos
-                (codigo, nome, nome_curto, categoria, ordem, ativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-            ON CONFLICT(codigo) DO UPDATE SET
-                nome=excluded.nome,
-                nome_curto=COALESCE(NULLIF(excluded.nome_curto,''), demanda_tipos.nome_curto),
-                categoria=COALESCE(NULLIF(excluded.categoria,''), demanda_tipos.categoria),
-                ordem=excluded.ordem,
-                ativo=COALESCE(demanda_tipos.ativo, 1),
-                atualizado_em=excluded.atualizado_em
-            """,
-            (
-                int(row["codigo"]),
-                str(row["nome"]),
-                str(row["nome_curto"]),
-                str(row["categoria"]),
-                int(row["ordem"]),
-                timestamp,
-                timestamp,
-            ),
+        existing = query_df(
+            "SELECT id FROM demanda_tipos WHERE codigo=? OR nome_curto=? ORDER BY id LIMIT 1",
+            (int(row["codigo"]), str(row["nome_curto"])),
         )
+        params = (
+            int(row["codigo"]),
+            str(row["nome"]),
+            str(row["nome_curto"]),
+            str(row["categoria"]),
+            int(row["ordem"]),
+            timestamp,
+        )
+        if existing.empty:
+            execute(
+                """
+                INSERT INTO demanda_tipos
+                    (codigo, nome, nome_curto, categoria, ordem, ativo, criado_em, atualizado_em)
+                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (*params, timestamp),
+            )
+        else:
+            execute(
+                """
+                UPDATE demanda_tipos
+                   SET codigo=?, nome=?, nome_curto=?, categoria=?, ordem=?,
+                       ativo=COALESCE(ativo,1), atualizado_em=?
+                 WHERE id=?
+                """,
+                (*params, int(existing.iloc[0]["id"])),
+            )
 
 
 def migrate_legacy_demandas_schema() -> None:
