@@ -39,7 +39,7 @@ AUTH_SESSION_TTL_SECONDS = 3600
 AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
-SCHEMA_VERSION = "2026-05-30-06"
+SCHEMA_VERSION = "2026-05-31-01"
 _ENGINE = None
 _ENGINE_URL = None
 
@@ -107,6 +107,12 @@ DEMANDA_STATUS_LABELS = {
     "cancelada": "Cancelada",
 }
 DEMANDA_PRIORIDADES = ["baixa", "normal", "alta", "urgente"]
+DEMANDA_DEPENDENCIAS_PADRAO = [
+    ("ENV_CONTRACHEQUES", "EXEC_FOLHA"),
+    ("GUIA_INSS", "EXEC_FOLHA"),
+    ("GUIA_FGTS", "EXEC_FOLHA"),
+    ("REL_MEI", "GUIA_MEI"),
+]
 REGIMES = ["Simples Nacional", "MEI", "Lucro Presumido", "Lucro Real", "Imune/Isenta", "Outro"]
 
 MODULES = [
@@ -2013,6 +2019,53 @@ def init_db() -> None:
         )
         execute(
             """
+            CREATE TABLE IF NOT EXISTS cliente_compartilhamentos (
+                id BIGSERIAL PRIMARY KEY,
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+                contador_origem TEXT NOT NULL,
+                contador_destino TEXT NOT NULL,
+                pode_ver INTEGER DEFAULT 1,
+                pode_editar INTEGER DEFAULT 0,
+                pode_criar_demandas INTEGER DEFAULT 0,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT,
+                ativo INTEGER DEFAULT 1
+            )
+            """
+        )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS cliente_estagiarios (
+                id BIGSERIAL PRIMARY KEY,
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+                contador_responsavel TEXT NOT NULL,
+                estagiario_username TEXT NOT NULL,
+                pode_ver_cliente INTEGER DEFAULT 1,
+                pode_ver_demandas INTEGER DEFAULT 1,
+                pode_concluir_demandas INTEGER DEFAULT 1,
+                pode_comentar INTEGER DEFAULT 1,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT,
+                ativo INTEGER DEFAULT 1
+            )
+            """
+        )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS demanda_dependencias (
+                id BIGSERIAL PRIMARY KEY,
+                demanda_tipo_id INTEGER,
+                tipo_dependente TEXT NOT NULL,
+                depende_de_tipo TEXT NOT NULL,
+                obrigatoria INTEGER DEFAULT 1,
+                ativo INTEGER DEFAULT 1,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT
+            )
+            """
+        )
+        execute(
+            """
             CREATE TABLE IF NOT EXISTS faturamento_mei (
                 id SERIAL PRIMARY KEY,
                 empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
@@ -2239,6 +2292,55 @@ def init_db() -> None:
             )
             conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS cliente_compartilhamentos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                empresa_id INTEGER NOT NULL,
+                contador_origem TEXT NOT NULL,
+                contador_destino TEXT NOT NULL,
+                pode_ver INTEGER DEFAULT 1,
+                pode_editar INTEGER DEFAULT 0,
+                pode_criar_demandas INTEGER DEFAULT 0,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT,
+                ativo INTEGER DEFAULT 1,
+                FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+            )
+            """
+            )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cliente_estagiarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                empresa_id INTEGER NOT NULL,
+                contador_responsavel TEXT NOT NULL,
+                estagiario_username TEXT NOT NULL,
+                pode_ver_cliente INTEGER DEFAULT 1,
+                pode_ver_demandas INTEGER DEFAULT 1,
+                pode_concluir_demandas INTEGER DEFAULT 1,
+                pode_comentar INTEGER DEFAULT 1,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT,
+                ativo INTEGER DEFAULT 1,
+                FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+            )
+            """
+            )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS demanda_dependencias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                demanda_tipo_id INTEGER,
+                tipo_dependente TEXT NOT NULL,
+                depende_de_tipo TEXT NOT NULL,
+                obrigatoria INTEGER DEFAULT 1,
+                ativo INTEGER DEFAULT 1,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                criado_por TEXT
+            )
+            """
+            )
+            conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS faturamento_mei (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 empresa_id INTEGER NOT NULL,
@@ -2349,6 +2451,9 @@ def init_db() -> None:
     ensure_column("empresas", "prefeitura_quitada_anos", "TEXT")
     ensure_column("empresas", "tem_parcelamento_mensal", "INTEGER", "0")
     ensure_column("empresas", "tem_parcelamento_impostos", "INTEGER", "0")
+    ensure_column("empresas", "contador_responsavel", "TEXT", "'DMLIMA'")
+    ensure_column("empresas", "criado_por", "TEXT")
+    ensure_column("empresas", "compartilhado", "INTEGER", "0")
     ensure_column("demanda_tipos", "codigo", "INTEGER")
     ensure_column("demanda_tipos", "nome", "TEXT")
     ensure_column("demanda_tipos", "nome_curto", "TEXT")
@@ -2384,6 +2489,39 @@ def init_db() -> None:
     ensure_column("demandas", "cancelada_em", "TEXT")
     ensure_column("demandas", "cancelada_por", "TEXT")
     ensure_column("demandas", "motivo_cancelamento", "TEXT")
+    ensure_column("demandas", "contador_responsavel", "TEXT")
+    ensure_column("demandas", "responsavel_operacional", "TEXT")
+    ensure_column("demandas", "liberada", "INTEGER", "1")
+    ensure_column("demandas", "bloqueada_por_demanda_id", "INTEGER")
+    ensure_column("demandas", "bloqueada_por_tipo", "TEXT")
+    ensure_column("demandas", "motivo_bloqueio", "TEXT")
+    ensure_column("demandas", "ordem_execucao", "INTEGER", "999")
+    ensure_column("cliente_compartilhamentos", "empresa_id", "INTEGER")
+    ensure_column("cliente_compartilhamentos", "contador_origem", "TEXT")
+    ensure_column("cliente_compartilhamentos", "contador_destino", "TEXT")
+    ensure_column("cliente_compartilhamentos", "pode_ver", "INTEGER", "1")
+    ensure_column("cliente_compartilhamentos", "pode_editar", "INTEGER", "0")
+    ensure_column("cliente_compartilhamentos", "pode_criar_demandas", "INTEGER", "0")
+    ensure_column("cliente_compartilhamentos", "criado_em", "TEXT")
+    ensure_column("cliente_compartilhamentos", "criado_por", "TEXT")
+    ensure_column("cliente_compartilhamentos", "ativo", "INTEGER", "1")
+    ensure_column("cliente_estagiarios", "empresa_id", "INTEGER")
+    ensure_column("cliente_estagiarios", "contador_responsavel", "TEXT")
+    ensure_column("cliente_estagiarios", "estagiario_username", "TEXT")
+    ensure_column("cliente_estagiarios", "pode_ver_cliente", "INTEGER", "1")
+    ensure_column("cliente_estagiarios", "pode_ver_demandas", "INTEGER", "1")
+    ensure_column("cliente_estagiarios", "pode_concluir_demandas", "INTEGER", "1")
+    ensure_column("cliente_estagiarios", "pode_comentar", "INTEGER", "1")
+    ensure_column("cliente_estagiarios", "criado_em", "TEXT")
+    ensure_column("cliente_estagiarios", "criado_por", "TEXT")
+    ensure_column("cliente_estagiarios", "ativo", "INTEGER", "1")
+    ensure_column("demanda_dependencias", "demanda_tipo_id", "INTEGER")
+    ensure_column("demanda_dependencias", "tipo_dependente", "TEXT")
+    ensure_column("demanda_dependencias", "depende_de_tipo", "TEXT")
+    ensure_column("demanda_dependencias", "obrigatoria", "INTEGER", "1")
+    ensure_column("demanda_dependencias", "ativo", "INTEGER", "1")
+    ensure_column("demanda_dependencias", "criado_em", "TEXT")
+    ensure_column("demanda_dependencias", "criado_por", "TEXT")
     ensure_column("demanda_status_historico", "demanda_id", "INTEGER")
     ensure_column("demanda_status_historico", "status_anterior", "TEXT")
     ensure_column("demanda_status_historico", "status_novo", "TEXT")
@@ -2416,6 +2554,8 @@ def init_db() -> None:
     ensure_column("logs_sistema", "criado_em", "TEXT")
     ensure_database_indexes()
     ensure_demanda_tipos_padrao()
+    ensure_demanda_dependencias_padrao()
+    migrar_responsabilidade_clientes_iniciais()
     migrate_legacy_demandas_schema()
     seed_default_users()
 
@@ -2426,10 +2566,14 @@ def ensure_database_indexes() -> None:
         "CREATE INDEX IF NOT EXISTS idx_empresas_razao_social ON empresas (razao_social)",
         "CREATE INDEX IF NOT EXISTS idx_empresas_regime ON empresas (regime)",
         "CREATE INDEX IF NOT EXISTS idx_empresas_is_ativo ON empresas (is_ativo)",
+        "CREATE INDEX IF NOT EXISTS idx_empresas_contador_responsavel ON empresas (contador_responsavel)",
         "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_competencia ON demandas (competencia)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_status ON demandas (status)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_responsavel ON demandas (responsavel)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_responsavel_operacional ON demandas (responsavel_operacional)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_contador_responsavel ON demandas (contador_responsavel)",
+        "CREATE INDEX IF NOT EXISTS idx_demandas_liberada ON demandas (liberada)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_id ON demandas (empresa_id)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_tipo ON demandas (tipo)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_comp_tipo ON demandas (empresa_id, competencia, tipo)",
@@ -2439,6 +2583,11 @@ def ensure_database_indexes() -> None:
         "CREATE INDEX IF NOT EXISTS idx_empresa_demandas_config_tipo_id ON empresa_demandas_config (demanda_tipo_id)",
         "CREATE INDEX IF NOT EXISTS idx_demanda_status_historico_demanda_id ON demanda_status_historico (demanda_id)",
         "CREATE INDEX IF NOT EXISTS idx_demanda_comentarios_demanda_id ON demanda_comentarios (demanda_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cliente_compart_unique ON cliente_compartilhamentos (empresa_id, contador_origem, contador_destino)",
+        "CREATE INDEX IF NOT EXISTS idx_cliente_compart_destino ON cliente_compartilhamentos (contador_destino)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_cliente_estagiario_unique ON cliente_estagiarios (empresa_id, estagiario_username)",
+        "CREATE INDEX IF NOT EXISTS idx_cliente_estagiarios_username ON cliente_estagiarios (estagiario_username)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_demanda_dependencias_unique ON demanda_dependencias (tipo_dependente, depende_de_tipo)",
         "CREATE INDEX IF NOT EXISTS idx_empresa_demandas_empresa_id ON empresa_demandas (empresa_id)",
         "CREATE INDEX IF NOT EXISTS idx_empresa_demandas_tipo ON empresa_demandas (tipo)",
         "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_empresa_id ON faturamento_mei (empresa_id)",
@@ -2880,22 +3029,32 @@ def clean_cell(value) -> str:
     return str(value).strip()
 
 
-def load_empresas(active_only: bool = True) -> pd.DataFrame:
+def load_empresas(active_only: bool = True, respect_permissions: bool = True) -> pd.DataFrame:
     active_expr = "COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END)"
     where = f"WHERE {active_expr}=1" if active_only else ""
-    return query_df(
+    df = query_df(
         f"""
         SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
                COALESCE(funcionarios,0) AS funcionarios,
+               COALESCE(contador_responsavel,'DMLIMA') AS contador_responsavel,
+               COALESCE(criado_por,'') AS criado_por,
+               COALESCE(compartilhado,0) AS compartilhado,
                {active_expr} AS is_ativo, atualizado_em
         FROM empresas
         {where}
         ORDER BY razao_social COLLATE NOCASE
         """
     )
+    if respect_permissions:
+        ids = visible_empresa_ids_for_user()
+        if ids is not None:
+            if not ids or df.empty:
+                return df.iloc[0:0].copy()
+            df = df[df["id"].astype(int).isin(ids)].copy()
+    return df
 
 
 def format_brl_currency(val: str) -> str:
@@ -2942,6 +3101,12 @@ def format_brl_currency(val: str) -> str:
 
 
 def save_empresa(data: dict, empresa_id: int | None = None) -> None:
+    if empresa_id and not usuario_pode_editar_cliente(current_username(), int(empresa_id)):
+        log_permission_denied("EDITAR_CLIENTE", "empresas", int(empresa_id))
+        raise PermissionError("Voce nao tem permissao para editar este cliente.")
+    if not empresa_id and is_estagiario() and not _system_context():
+        log_permission_denied("CRIAR_CLIENTE", "empresas", 0)
+        raise PermissionError("Estagiario nao pode cadastrar cliente.")
     timestamp = now_str()
     before_existing = empresa_row(int(empresa_id)) if empresa_id else {}
 
@@ -2962,6 +3127,17 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
     is_ativo = 0 if inativo else 1
     simples_optante = int_field("simples_optante", 0)
     mei_optante = int_field("mei_optante", 0)
+    requested_contador = normalize_username(txt_field("contador_responsavel", ""))
+    if empresa_id:
+        contador_responsavel = requested_contador or normalize_username(before_existing.get("contador_responsavel")) or "DMLIMA"
+        if not (is_admin_geral() or _system_context()) and contador_responsavel != normalize_username(before_existing.get("contador_responsavel")):
+            raise PermissionError("Somente administrador pode trocar o contador responsavel.")
+    elif is_admin_geral() or _system_context():
+        contador_responsavel = requested_contador or "DMLIMA"
+    elif is_contador():
+        contador_responsavel = current_username()
+    else:
+        contador_responsavel = "DMLIMA"
     normalized = {
         "cnpj": normalize_cnpj(txt_field("cnpj")),
         "razao_social": txt_field("razao_social"),
@@ -2984,6 +3160,9 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
         "observacoes": txt_field("observacoes"),
         "inativo": inativo,
         "is_ativo": is_ativo,
+        "contador_responsavel": contador_responsavel,
+        "criado_por": normalize_username(txt_field("criado_por", current_username() or contador_responsavel)),
+        "compartilhado": int_field("compartilhado", 0),
         "timestamp": timestamp,
     }
     if not normalized["cnpj"] or not normalized["razao_social"]:
@@ -3001,7 +3180,7 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                    abertura=?, situacao=?, porte=?, natureza_juridica=?, capital_social=?,
                    simples_optante=?, mei_optante=?, mensalidade=?, cidade=?, uf=?,
                    funcionarios=?, link_rapido=?, senhas_acessos=?, observacoes=?,
-                   inativo=?, is_ativo=?, atualizado_em=?
+                   inativo=?, is_ativo=?, contador_responsavel=?, compartilhado=?, atualizado_em=?
              WHERE id=?
             """,
             (
@@ -3026,6 +3205,8 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["observacoes"],
                 normalized["inativo"],
                 normalized["is_ativo"],
+                normalized["contador_responsavel"],
+                normalized["compartilhado"],
                 timestamp,
                 int(empresa_id),
             ),
@@ -3061,8 +3242,8 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 (cnpj, razao_social, nome_fantasia, apelido, regime, abertura, situacao,
                  porte, natureza_juridica, capital_social, simples_optante, mei_optante,
                  mensalidade, cidade, uf, funcionarios, link_rapido, senhas_acessos, observacoes,
-                 inativo, is_ativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 inativo, is_ativo, contador_responsavel, criado_por, compartilhado, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 normalized["cnpj"],
@@ -3086,6 +3267,9 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["observacoes"],
                 normalized["inativo"],
                 normalized["is_ativo"],
+                normalized["contador_responsavel"],
+                normalized["criado_por"],
+                normalized["compartilhado"],
                 timestamp,
                 timestamp,
             ),
@@ -3111,6 +3295,9 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
                COALESCE(link_rapido,'') AS link_rapido,
                COALESCE(senhas_acessos,'') AS senhas_acessos,
                COALESCE(observacoes,'') AS observacoes,
+               COALESCE(contador_responsavel,'DMLIMA') AS contador_responsavel,
+               COALESCE(criado_por,'') AS criado_por,
+               COALESCE(compartilhado,0) AS compartilhado,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
                atualizado_em, criado_em
           FROM empresas
@@ -3143,6 +3330,9 @@ def empresa_row(empresa_id: int) -> dict:
                COALESCE(link_rapido,'') AS link_rapido,
                COALESCE(senhas_acessos,'') AS senhas_acessos,
                COALESCE(observacoes,'') AS observacoes,
+               COALESCE(contador_responsavel,'DMLIMA') AS contador_responsavel,
+               COALESCE(criado_por,'') AS criado_por,
+               COALESCE(compartilhado,0) AS compartilhado,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
                atualizado_em, criado_em
           FROM empresas
@@ -3179,6 +3369,9 @@ def empresa_snapshot(row: dict | None) -> dict:
         "link_rapido": str(data.get("link_rapido", "") or ""),
         "senhas_acessos": str(data.get("senhas_acessos", "") or ""),
         "observacoes": str(data.get("observacoes", "") or ""),
+        "contador_responsavel": normalize_username(data.get("contador_responsavel", "DMLIMA")),
+        "criado_por": normalize_username(data.get("criado_por", "")),
+        "compartilhado": int(data.get("compartilhado", 0) or 0),
         "inativo": int(data.get("inativo", 0) or 0),
         "is_ativo": int(data.get("is_ativo", 1) or 1),
         "atualizado_em": str(data.get("atualizado_em", "") or ""),
@@ -3312,6 +3505,7 @@ def empresas_export_csv(df: pd.DataFrame) -> bytes:
         "nome_fantasia",
         "apelido",
         "regime",
+        "contador_responsavel",
         "mensalidade",
         "cidade",
         "uf",
@@ -3380,6 +3574,7 @@ def empresas_apply_import(df: pd.DataFrame) -> tuple[int, int]:
             "mensalidade": pick("mensalidade", existing.get("mensalidade", "") if existing else "").strip(),
             "cidade": pick("cidade", existing.get("cidade", "") if existing else "").strip(),
             "uf": pick("uf", existing.get("uf", "") if existing else "").strip().upper(),
+            "contador_responsavel": normalize_username(pick("contador_responsavel", existing.get("contador_responsavel", current_username() or "DMLIMA") if existing else current_username() or "DMLIMA")),
             "inativo": int(float(str(row.get("inativo", existing.get("inativo", 0) if existing else 0) or 0).replace(",", "."))),
         }
 
@@ -3435,6 +3630,208 @@ def can_cancel_demanda(usuario: str | None = None) -> bool:
 
 def can_assign_demanda() -> bool:
     return is_admin_geral() or is_contador()
+
+
+def _system_context() -> bool:
+    return not bool(current_username())
+
+
+def is_contador_role(role: str) -> bool:
+    return str(role or "").strip() in {"admin_geral", "contador"}
+
+
+def usuario_role(username: str) -> str:
+    username_norm = normalize_username(username)
+    if username_norm == "DMLIMA":
+        return "admin_geral"
+    if username_norm == "RAFAEL":
+        return "contador"
+    row = get_user_row(username_norm)
+    return str(row.get("role") or "usuario") if row else "usuario"
+
+
+def all_contadores() -> list[str]:
+    df = get_users_df()
+    values = set()
+    if not df.empty:
+        allowed = df[(df["ativo"] == 1) & (df["role"].isin(["admin_geral", "contador"]))]
+        values.update(allowed["username"].astype(str).str.upper().tolist())
+    values.update(["DMLIMA", "RAFAEL"])
+    return sorted(values)
+
+
+def all_estagiarios() -> list[str]:
+    df = get_users_df()
+    if df.empty:
+        return []
+    allowed = df[(df["ativo"] == 1) & (df["role"].isin(["estagiario", "usuario"]))]
+    return sorted(allowed["username"].astype(str).str.upper().tolist())
+
+
+def visible_empresa_ids_for_user(username: str | None = None, role: str | None = None, *, demandas: bool = False) -> set[int] | None:
+    username_norm = normalize_username(username or current_username())
+    role = role or (usuario_role(username_norm) if username_norm else current_user_role())
+    if not username_norm or role == "admin_geral" or username_norm == "DMLIMA":
+        return None
+
+    ids: set[int] = set()
+    if role == "contador" or username_norm == "RAFAEL":
+        owned = query_df("SELECT id FROM empresas WHERE UPPER(COALESCE(contador_responsavel,''))=UPPER(?)", (username_norm,))
+        if not owned.empty:
+            ids.update(owned["id"].dropna().astype(int).tolist())
+        shared = query_df(
+            """
+            SELECT empresa_id
+              FROM cliente_compartilhamentos
+             WHERE UPPER(contador_destino)=UPPER(?)
+               AND COALESCE(ativo,1)=1
+               AND COALESCE(pode_ver,1)=1
+            """,
+            (username_norm,),
+        )
+        if not shared.empty:
+            ids.update(shared["empresa_id"].dropna().astype(int).tolist())
+        return ids
+
+    est = query_df(
+        f"""
+        SELECT empresa_id
+          FROM cliente_estagiarios
+         WHERE UPPER(estagiario_username)=UPPER(?)
+           AND COALESCE(ativo,1)=1
+           AND COALESCE({'pode_ver_demandas' if demandas else 'pode_ver_cliente'},1)=1
+        """,
+        (username_norm,),
+    )
+    if not est.empty:
+        ids.update(est["empresa_id"].dropna().astype(int).tolist())
+    return ids
+
+
+def get_clientes_visiveis_para_usuario(username: str | None = None, role: str | None = None) -> pd.DataFrame:
+    df = load_empresas(active_only=False, respect_permissions=False)
+    ids = visible_empresa_ids_for_user(username, role)
+    if ids is None:
+        return df
+    if not ids or df.empty:
+        return df.iloc[0:0].copy()
+    return df[df["id"].astype(int).isin(ids)].copy()
+
+
+def usuario_pode_ver_cliente(username: str | None, empresa_id: int) -> bool:
+    ids = visible_empresa_ids_for_user(username)
+    return ids is None or int(empresa_id) in ids
+
+
+def usuario_pode_editar_cliente(username: str | None, empresa_id: int) -> bool:
+    username_norm = normalize_username(username or current_username())
+    role = usuario_role(username_norm) if username_norm else current_user_role()
+    if _system_context() or role == "admin_geral" or username_norm == "DMLIMA":
+        return True
+    row = empresa_row(int(empresa_id))
+    if not row:
+        return False
+    if (role == "contador" or username_norm == "RAFAEL") and normalize_username(row.get("contador_responsavel")) == username_norm:
+        return True
+    shared = query_df(
+        """
+        SELECT 1
+          FROM cliente_compartilhamentos
+         WHERE empresa_id=?
+           AND UPPER(contador_destino)=UPPER(?)
+           AND COALESCE(ativo,1)=1
+           AND COALESCE(pode_editar,0)=1
+         LIMIT 1
+        """,
+        (int(empresa_id), username_norm),
+    )
+    return not shared.empty
+
+
+def usuario_pode_criar_demandas_cliente(username: str | None, empresa_id: int) -> bool:
+    username_norm = normalize_username(username or current_username())
+    role = usuario_role(username_norm) if username_norm else current_user_role()
+    if _system_context() or role == "admin_geral" or username_norm == "DMLIMA":
+        return True
+    row = empresa_row(int(empresa_id))
+    if not row:
+        return False
+    if (role == "contador" or username_norm == "RAFAEL") and normalize_username(row.get("contador_responsavel")) == username_norm:
+        return True
+    shared = query_df(
+        """
+        SELECT 1
+          FROM cliente_compartilhamentos
+         WHERE empresa_id=?
+           AND UPPER(contador_destino)=UPPER(?)
+           AND COALESCE(ativo,1)=1
+           AND COALESCE(pode_criar_demandas,0)=1
+         LIMIT 1
+        """,
+        (int(empresa_id), username_norm),
+    )
+    return not shared.empty
+
+
+def usuario_pode_ver_demanda(username: str | None, demanda_id: int) -> bool:
+    row = demanda_row(int(demanda_id))
+    if not row:
+        return False
+    return usuario_pode_ver_cliente(username, int(row.get("empresa_id") or 0))
+
+
+def usuario_pode_concluir_demanda(username: str | None, demanda_id: int) -> bool:
+    username_norm = normalize_username(username or current_username())
+    role = usuario_role(username_norm) if username_norm else current_user_role()
+    row = demanda_row(int(demanda_id))
+    if not row:
+        return False
+    if _system_context() or role in {"admin_geral", "contador"} or username_norm in {"DMLIMA", "RAFAEL"}:
+        return usuario_pode_ver_cliente(username_norm, int(row.get("empresa_id") or 0))
+    perm = query_df(
+        """
+        SELECT 1
+          FROM cliente_estagiarios
+         WHERE empresa_id=?
+           AND UPPER(estagiario_username)=UPPER(?)
+           AND COALESCE(ativo,1)=1
+           AND COALESCE(pode_ver_demandas,1)=1
+           AND COALESCE(pode_concluir_demandas,1)=1
+         LIMIT 1
+        """,
+        (int(row.get("empresa_id") or 0), username_norm),
+    )
+    return not perm.empty
+
+
+def can_share_cliente(empresa_id: int, username: str | None = None) -> bool:
+    username_norm = normalize_username(username or current_username())
+    role = usuario_role(username_norm) if username_norm else current_user_role()
+    if _system_context() or role == "admin_geral" or username_norm == "DMLIMA":
+        return True
+    row = empresa_row(int(empresa_id))
+    return bool(row and (role == "contador" or username_norm == "RAFAEL") and normalize_username(row.get("contador_responsavel")) == username_norm)
+
+
+def log_permission_denied(acao: str, entidade: str, entidade_id: int, detalhe: str = "") -> None:
+    try:
+        log_action("Permissoes", acao, entidade, entidade_id, current_user(), detalhe)
+    except Exception:
+        pass
+
+
+def int_flag(value, default: int = 0) -> int:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except Exception:
+        pass
+    try:
+        return int(value)
+    except Exception:
+        return default
 
 
 def get_competencia_atual() -> str:
@@ -3506,6 +3903,68 @@ def ensure_demanda_tipos_padrao() -> None:
             )
 
 
+def ensure_demanda_dependencias_padrao() -> None:
+    timestamp = now_str()
+    for tipo_dependente, depende_de_tipo in DEMANDA_DEPENDENCIAS_PADRAO:
+        existing = query_df(
+            """
+            SELECT id
+              FROM demanda_dependencias
+             WHERE tipo_dependente=? AND depende_de_tipo=?
+             LIMIT 1
+            """,
+            (tipo_dependente, depende_de_tipo),
+        )
+        tipo_id = demanda_tipo_id_by_code(tipo_dependente)
+        if existing.empty:
+            execute(
+                """
+                INSERT INTO demanda_dependencias
+                    (demanda_tipo_id, tipo_dependente, depende_de_tipo, obrigatoria, ativo, criado_em, criado_por)
+                VALUES (?, ?, ?, 1, 1, ?, ?)
+                """,
+                (int(tipo_id or 0) or None, tipo_dependente, depende_de_tipo, timestamp, "sistema"),
+            )
+        else:
+            execute(
+                """
+                UPDATE demanda_dependencias
+                   SET demanda_tipo_id=?, obrigatoria=1, ativo=COALESCE(ativo,1)
+                 WHERE id=?
+                """,
+                (int(tipo_id or 0) or None, int(existing.iloc[0]["id"])),
+            )
+
+
+def migrar_responsabilidade_clientes_iniciais() -> dict:
+    report = {"clientes_atualizados": 0, "demandas_atualizadas": 0, "clientes_ignorados": 0, "erros": []}
+    try:
+        report["clientes_atualizados"] = execute(
+            """
+            UPDATE empresas
+               SET contador_responsavel='DMLIMA',
+                   criado_por=COALESCE(NULLIF(criado_por,''), 'DMLIMA')
+             WHERE contador_responsavel IS NULL OR TRIM(contador_responsavel)=''
+            """
+        )
+        report["clientes_ignorados"] = int(query_df("SELECT COUNT(*) AS total FROM empresas WHERE COALESCE(contador_responsavel,'')<>''").iloc[0]["total"])
+        report["demandas_atualizadas"] = execute(
+            """
+            UPDATE demandas
+               SET contador_responsavel = (
+                   SELECT COALESCE(NULLIF(e.contador_responsavel,''), 'DMLIMA')
+                     FROM empresas e
+                    WHERE e.id = demandas.empresa_id
+                    LIMIT 1
+               )
+             WHERE contador_responsavel IS NULL OR TRIM(contador_responsavel)=''
+            """
+        )
+    except Exception as exc:
+        report["erros"].append(str(exc))
+    return report
+
+
 def migrate_legacy_demandas_schema() -> None:
     execute(
         """
@@ -3544,6 +4003,35 @@ def migrate_legacy_demandas_schema() -> None:
     )
     execute(
         """
+        UPDATE demandas
+           SET contador_responsavel = (
+               SELECT COALESCE(NULLIF(e.contador_responsavel,''), 'DMLIMA')
+                 FROM empresas e
+                WHERE e.id = demandas.empresa_id
+                LIMIT 1
+           )
+         WHERE contador_responsavel IS NULL OR TRIM(contador_responsavel)=''
+        """
+    )
+    execute(
+        """
+        UPDATE demandas
+           SET responsavel_operacional = COALESCE(NULLIF(responsavel_operacional,''), responsavel)
+         WHERE responsavel IS NOT NULL AND responsavel<>''
+        """
+    )
+    execute(
+        """
+        UPDATE demandas
+           SET ordem_execucao = COALESCE(
+               (SELECT dt.ordem FROM demanda_tipos dt WHERE dt.nome_curto = demandas.tipo LIMIT 1),
+               999
+           )
+         WHERE ordem_execucao IS NULL OR ordem_execucao=999
+        """
+    )
+    execute(
+        """
         INSERT INTO empresa_demandas_config
             (empresa_id, demanda_tipo_id, ativo, criado_em, atualizado_em, criado_por, atualizado_por)
         SELECT ed.empresa_id, dt.id, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'migracao', 'migracao'
@@ -3565,12 +4053,15 @@ def demanda_tipo_id_by_code(tipo: str) -> int | None:
 
 def load_empresas_ativas() -> pd.DataFrame:
     active_expr = "COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END)"
-    return query_df(
+    df = query_df(
         f"""
         SELECT id, cnpj, razao_social, COALESCE(nome_fantasia,'') AS nome_fantasia,
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
                COALESCE(cidade,'') AS cidade, COALESCE(uf,'') AS uf,
                COALESCE(funcionarios,0) AS funcionarios,
+               COALESCE(contador_responsavel,'DMLIMA') AS contador_responsavel,
+               COALESCE(criado_por,'') AS criado_por,
+               COALESCE(compartilhado,0) AS compartilhado,
                COALESCE(prefeitura_encerrada_ano_atual,0) AS prefeitura_encerrada_ano_atual,
                COALESCE(prefeitura_quitada_anos,'') AS prefeitura_quitada_anos,
                COALESCE(tem_parcelamento_mensal,0) AS tem_parcelamento_mensal,
@@ -3578,9 +4069,15 @@ def load_empresas_ativas() -> pd.DataFrame:
                {active_expr} AS is_ativo
           FROM empresas
          WHERE {active_expr}=1
-         ORDER BY COALESCE(apelido,''), razao_social COLLATE NOCASE
+        ORDER BY COALESCE(apelido,''), razao_social COLLATE NOCASE
         """
     )
+    ids = visible_empresa_ids_for_user(demandas=True)
+    if ids is not None:
+        if not ids or df.empty:
+            return df.iloc[0:0].copy()
+        df = df[df["id"].astype(int).isin(ids)].copy()
+    return df
 
 
 def load_demandas(competencia: str, filtros: dict | None = None) -> pd.DataFrame:
@@ -3590,7 +4087,9 @@ def load_demandas(competencia: str, filtros: dict | None = None) -> pd.DataFrame
                COALESCE(dt.nome, d.tipo) AS demanda,
                COALESCE(d.status, CASE WHEN COALESCE(d.feito,0)=1 THEN 'concluida' ELSE 'pendente' END) AS status,
                CASE WHEN COALESCE(d.status,'')='concluida' OR COALESCE(d.feito,0)=1 THEN 1 ELSE 0 END AS feito,
-               COALESCE(d.responsavel,'') AS responsavel,
+               COALESCE(d.contador_responsavel, e.contador_responsavel, 'DMLIMA') AS contador_responsavel,
+               COALESCE(d.responsavel_operacional, d.responsavel, '') AS responsavel_operacional,
+               COALESCE(d.responsavel, d.responsavel_operacional, '') AS responsavel,
                COALESCE(d.prioridade,'normal') AS prioridade,
                COALESCE(d.observacao,'') AS observacao,
                COALESCE(d.data_limite,'') AS data_limite,
@@ -3603,6 +4102,11 @@ def load_demandas(competencia: str, filtros: dict | None = None) -> pd.DataFrame
                COALESCE(d.origem,'manual') AS origem,
                COALESCE(d.replicada_de_id,0) AS replicada_de_id,
                COALESCE(d.cancelada,0) AS cancelada,
+               COALESCE(d.liberada,1) AS liberada,
+               COALESCE(d.bloqueada_por_demanda_id,0) AS bloqueada_por_demanda_id,
+               COALESCE(d.bloqueada_por_tipo,'') AS bloqueada_por_tipo,
+               COALESCE(d.motivo_bloqueio,'') AS motivo_bloqueio,
+               COALESCE(d.ordem_execucao,999) AS ordem_execucao,
                e.razao_social, e.cnpj, COALESCE(e.apelido,'') AS apelido,
                COALESCE(e.regime,'') AS regime, COALESCE(e.cidade,'') AS cidade,
                COALESCE(e.uf,'') AS uf, COALESCE(e.funcionarios,0) AS funcionarios,
@@ -3618,9 +4122,22 @@ def load_demandas(competencia: str, filtros: dict | None = None) -> pd.DataFrame
     if df.empty:
         return df
 
+    ids = visible_empresa_ids_for_user(demandas=True)
+    if ids is not None:
+        if not ids:
+            return df.iloc[0:0].copy()
+        df = df[df["empresa_id"].astype(int).isin(ids)].copy()
+        if is_estagiario() and current_username():
+            username = current_username()
+            assigned = df["responsavel_operacional"].astype(str).str.upper() == username
+            unassigned_allowed = df["responsavel_operacional"].fillna("").astype(str).str.strip() == ""
+            df = df[assigned | unassigned_allowed].copy()
+
     df["tipo"] = df["tipo"].map(normalize_demanda_tipo)
     df["demanda"] = df.apply(lambda row: row["demanda"] or DEMAND_LABELS.get(row["tipo"], row["tipo"]), axis=1)
     df["status_label"] = df["status"].map(lambda s: DEMANDA_STATUS_LABELS.get(str(s), str(s)))
+    df["liberacao"] = df["liberada"].map(lambda v: "Liberada" if int(v or 0) == 1 else "Bloqueada")
+    df["bloqueio"] = df["motivo_bloqueio"].fillna("")
     df["empresa"] = df.apply(
         lambda row: str(row.get("apelido") or row.get("razao_social") or "").strip(),
         axis=1,
@@ -3644,12 +4161,23 @@ def load_demandas(competencia: str, filtros: dict | None = None) -> pd.DataFrame
             + df["tipo"].fillna("")
         ).str.upper()
         df = df[blob.str.contains(search, regex=False)]
-    for key, col in [("tipo", "tipo"), ("status", "status"), ("responsavel", "responsavel"), ("prioridade", "prioridade"), ("regime", "regime")]:
+    for key, col in [
+        ("tipo", "tipo"),
+        ("status", "status"),
+        ("responsavel", "responsavel_operacional"),
+        ("contador_responsavel", "contador_responsavel"),
+        ("prioridade", "prioridade"),
+        ("regime", "regime"),
+        ("liberada", "liberacao"),
+    ]:
         value = str(filtros.get(key, "") or "").strip()
         if value and value != "Todos":
             df = df[df[col].fillna("").astype(str) == value]
     if filtros.get("minhas"):
-        df = df[df["responsavel"].astype(str).str.upper() == current_username()]
+        df = df[
+            (df["responsavel_operacional"].astype(str).str.upper() == current_username())
+            | (df["responsavel"].astype(str).str.upper() == current_username())
+        ]
     if filtros.get("atrasadas"):
         df = df[df["atrasada"]]
     if not filtros.get("mostrar_concluidas", True):
@@ -3678,16 +4206,23 @@ def create_demanda(
     data_limite: str = "",
     replicada_de_id: int | None = None,
 ) -> int:
+    if not usuario_pode_criar_demandas_cliente(current_username(), int(empresa_id)):
+        log_permission_denied("CRIAR_DEMANDA", "empresas", int(empresa_id))
+        raise PermissionError("Voce nao tem permissao para criar demandas deste cliente.")
+    empresa = empresa_row(int(empresa_id))
+    contador_resp = normalize_username(empresa.get("contador_responsavel", "DMLIMA")) or "DMLIMA"
     tipo_code = normalize_demanda_tipo(tipo)
     tipo_id = demanda_tipo_id_by_code(tipo_code)
     timestamp = now_str()
+    ordem_execucao = demand_order_value(tipo_code)
     created = execute(
         """
         INSERT INTO demandas
-            (empresa_id, demanda_tipo_id, tipo, competencia, status, feito, responsavel,
+            (empresa_id, demanda_tipo_id, tipo, competencia, status, feito, contador_responsavel, responsavel,
+             responsavel_operacional,
              prioridade, observacao, data_limite, criado_em, atualizado_em, criado_por,
-             atualizado_por, origem, replicada_de_id, cancelada)
-        VALUES (?, ?, ?, ?, 'pendente', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+             atualizado_por, origem, replicada_de_id, cancelada, liberada, ordem_execucao)
+        VALUES (?, ?, ?, ?, 'pendente', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)
         ON CONFLICT(empresa_id, competencia, tipo) DO NOTHING
         """,
         (
@@ -3695,6 +4230,8 @@ def create_demanda(
             int(tipo_id or 0) or None,
             tipo_code,
             competencia,
+            contador_resp,
+            str(responsavel or "").strip(),
             str(responsavel or "").strip(),
             prioridade if prioridade in DEMANDA_PRIORIDADES else "normal",
             str(observacao or "").strip(),
@@ -3705,10 +4242,12 @@ def create_demanda(
             current_user(),
             str(origem or "manual"),
             int(replicada_de_id) if replicada_de_id else None,
+            ordem_execucao,
         ),
     )
     if created:
         log_action("Demandas", "CRIAR", "demandas", 0, current_user(), f"{empresa_id} {competencia} {tipo_code}")
+        recalcular_liberacao_demandas(int(empresa_id), competencia)
     return created
 
 
@@ -3723,7 +4262,8 @@ def demanda_row(demanda_id: int) -> dict:
     df = query_df(
         """
         SELECT d.*, COALESCE(dt.nome,d.tipo) AS demanda, e.razao_social, e.cnpj,
-               COALESCE(e.apelido,'') AS apelido, COALESCE(e.regime,'') AS regime
+               COALESCE(e.apelido,'') AS apelido, COALESCE(e.regime,'') AS regime,
+               COALESCE(e.contador_responsavel,'DMLIMA') AS empresa_contador_responsavel
           FROM demandas d
           JOIN empresas e ON e.id=d.empresa_id
           LEFT JOIN demanda_tipos dt ON dt.id=d.demanda_tipo_id OR dt.nome_curto=d.tipo
@@ -3733,6 +4273,73 @@ def demanda_row(demanda_id: int) -> dict:
         (int(demanda_id),),
     )
     return df.iloc[0].to_dict() if not df.empty else {}
+
+
+def load_demanda_dependencias(ativos: bool = True) -> pd.DataFrame:
+    where = "WHERE COALESCE(ativo,1)=1" if ativos else ""
+    return query_df(
+        f"""
+        SELECT id, demanda_tipo_id, tipo_dependente, depende_de_tipo,
+               COALESCE(obrigatoria,1) AS obrigatoria,
+               COALESCE(ativo,1) AS ativo
+          FROM demanda_dependencias
+          {where}
+         ORDER BY tipo_dependente, depende_de_tipo
+        """
+    )
+
+
+def recalcular_liberacao_demandas(empresa_id: int, competencia: str) -> None:
+    deps = load_demanda_dependencias(True)
+    if deps.empty:
+        return
+    demandas_empresa = query_df(
+        """
+        SELECT id, tipo, COALESCE(status,'pendente') AS status
+          FROM demandas
+         WHERE empresa_id=? AND competencia=? AND COALESCE(cancelada,0)=0
+        """,
+        (int(empresa_id), competencia),
+    )
+    if demandas_empresa.empty:
+        return
+    by_tipo = {str(row["tipo"]): row.to_dict() for _, row in demandas_empresa.iterrows()}
+    for _, dep in deps.iterrows():
+        dependente = normalize_demanda_tipo(str(dep["tipo_dependente"]))
+        requisito = normalize_demanda_tipo(str(dep["depende_de_tipo"]))
+        if dependente not in by_tipo:
+            continue
+        dependente_row = by_tipo[dependente]
+        requisito_row = by_tipo.get(requisito)
+        if not requisito_row:
+            continue
+        requisito_concluido = str(requisito_row.get("status") or "") == "concluida"
+        if requisito_concluido:
+            execute(
+                """
+                UPDATE demandas
+                   SET liberada=1, bloqueada_por_demanda_id=NULL, bloqueada_por_tipo=NULL,
+                       motivo_bloqueio=NULL, atualizado_em=?
+                 WHERE id=?
+                """,
+                (now_str(), int(dependente_row["id"])),
+            )
+        elif str(dependente_row.get("status") or "") != "concluida":
+            execute(
+                """
+                UPDATE demandas
+                   SET liberada=0, bloqueada_por_demanda_id=?, bloqueada_por_tipo=?,
+                       motivo_bloqueio=?, atualizado_em=?
+                 WHERE id=?
+                """,
+                (
+                    int(requisito_row["id"]),
+                    requisito,
+                    f"Aguardando conclusao de: {DEMAND_LABELS.get(requisito, requisito)}",
+                    now_str(),
+                    int(dependente_row["id"]),
+                ),
+            )
 
 
 def record_demanda_status(demanda_id: int, status_anterior: str, status_novo: str, usuario: str, observacao: str = "") -> None:
@@ -3756,6 +4363,15 @@ def update_demanda_status(demanda_id: int, status_novo, usuario: str | None = No
     before = demanda_row(int(demanda_id))
     if not before:
         raise ValueError("Demanda nao encontrada.")
+    if not usuario_pode_ver_demanda(usuario, int(demanda_id)):
+        log_permission_denied("ALTERAR_DEMANDA", "demandas", int(demanda_id))
+        raise PermissionError("Voce nao tem permissao para alterar esta demanda.")
+    if status_novo == "concluida":
+        if not usuario_pode_concluir_demanda(usuario, int(demanda_id)):
+            log_permission_denied("CONCLUIR_DEMANDA", "demandas", int(demanda_id))
+            raise PermissionError("Voce nao tem permissao para concluir esta demanda.")
+        if int_flag(before.get("liberada"), 1) != 1:
+            raise PermissionError(str(before.get("motivo_bloqueio") or "Demanda bloqueada por dependencia."))
     status_anterior = str(before.get("status") or ("concluida" if int(before.get("feito", 0) or 0) else "pendente"))
     timestamp = now_str()
     concluida_em = timestamp if status_novo == "concluida" else (before.get("concluida_em") or "")
@@ -3774,6 +4390,7 @@ def update_demanda_status(demanda_id: int, status_novo, usuario: str | None = No
     if status_anterior != status_novo:
         record_demanda_status(int(demanda_id), status_anterior, status_novo, usuario, observacao or "")
     log_action("Demandas", "STATUS", "demandas", int(demanda_id), usuario, f"{status_anterior} -> {status_novo}")
+    recalcular_liberacao_demandas(int(before.get("empresa_id") or 0), str(before.get("competencia") or ""))
 
 
 def update_demanda_observacao(demanda_id: int, observacao: str, usuario: str | None = None) -> None:
@@ -3808,14 +4425,18 @@ def update_demanda_campos(
     usuario: str | None = None,
 ) -> None:
     usuario = usuario or current_user()
+    if not usuario_pode_ver_demanda(usuario, int(demanda_id)):
+        log_permission_denied("EDITAR_DEMANDA", "demandas", int(demanda_id))
+        raise PermissionError("Voce nao tem permissao para editar esta demanda.")
     execute(
         """
         UPDATE demandas
-           SET responsavel=?, prioridade=?, data_limite=?, observacao=?,
+           SET responsavel=?, responsavel_operacional=?, prioridade=?, data_limite=?, observacao=?,
                atualizado_em=?, atualizado_por=?
          WHERE id=?
         """,
         (
+            str(responsavel or "").strip(),
             str(responsavel or "").strip(),
             prioridade if prioridade in DEMANDA_PRIORIDADES else "normal",
             str(data_limite or "").strip(),
@@ -3831,6 +4452,9 @@ def delete_or_cancel_demanda(demanda_id: int, usuario: str | None = None, motivo
     if not can_cancel_demanda(usuario):
         raise PermissionError("Seu perfil nao permite cancelar demandas.")
     usuario = usuario or current_user()
+    if not usuario_pode_ver_demanda(usuario, int(demanda_id)):
+        log_permission_denied("CANCELAR_DEMANDA", "demandas", int(demanda_id))
+        raise PermissionError("Voce nao tem permissao para cancelar esta demanda.")
     update_demanda_status(int(demanda_id), "cancelada", usuario, motivo)
     execute(
         """
@@ -3853,6 +4477,11 @@ def concluir_demanda(demanda_id: int, usuario: str | None = None) -> None:
 def reabrir_demanda(demanda_id: int, usuario: str | None = None) -> None:
     usuario = usuario or current_user()
     before = demanda_row(int(demanda_id))
+    if not before:
+        raise ValueError("Demanda nao encontrada.")
+    if not usuario_pode_concluir_demanda(usuario, int(demanda_id)):
+        log_permission_denied("REABRIR_DEMANDA", "demandas", int(demanda_id))
+        raise PermissionError("Voce nao tem permissao para reabrir esta demanda.")
     status_anterior = str(before.get("status") or "concluida")
     execute(
         """
@@ -3864,6 +4493,7 @@ def reabrir_demanda(demanda_id: int, usuario: str | None = None) -> None:
         (now_str(), usuario, int(demanda_id)),
     )
     record_demanda_status(int(demanda_id), status_anterior, "pendente", usuario, "Reaberta")
+    recalcular_liberacao_demandas(int(before.get("empresa_id") or 0), str(before.get("competencia") or ""))
 
 
 def load_config_demandas_empresa(empresa_id: int) -> set[str]:
@@ -3872,6 +4502,9 @@ def load_config_demandas_empresa(empresa_id: int) -> set[str]:
 
 def save_config_demandas_empresa(empresa_id: int, lista_tipos: list[str], usuario: str | None = None) -> None:
     usuario = usuario or current_user()
+    if not usuario_pode_criar_demandas_cliente(usuario, int(empresa_id)):
+        log_permission_denied("CONFIG_DEMANDAS_CLIENTE", "empresas", int(empresa_id))
+        raise PermissionError("Voce nao tem permissao para configurar demandas deste cliente.")
     timestamp = now_str()
     execute(
         "UPDATE empresa_demandas_config SET ativo=0, atualizado_em=?, atualizado_por=? WHERE empresa_id=?",
@@ -3900,6 +4533,164 @@ def save_config_demandas_empresa(empresa_id: int, lista_tipos: list[str], usuari
             (int(empresa_id), tipo),
         )
     log_action("Demandas", "CONFIG_EMPRESA", "empresas", int(empresa_id), usuario, ",".join(sorted(lista_tipos)))
+
+
+def load_cliente_compartilhamentos(empresa_id: int) -> pd.DataFrame:
+    return query_df(
+        """
+        SELECT id, empresa_id, contador_origem, contador_destino,
+               COALESCE(pode_ver,1) AS pode_ver,
+               COALESCE(pode_editar,0) AS pode_editar,
+               COALESCE(pode_criar_demandas,0) AS pode_criar_demandas,
+               COALESCE(ativo,1) AS ativo,
+               criado_em, COALESCE(criado_por,'') AS criado_por
+          FROM cliente_compartilhamentos
+         WHERE empresa_id=?
+         ORDER BY ativo DESC, contador_destino
+        """,
+        (int(empresa_id),),
+    )
+
+
+def salvar_compartilhamento_cliente(
+    empresa_id: int,
+    contador_destino: str,
+    pode_ver: bool,
+    pode_editar: bool,
+    pode_criar_demandas: bool,
+    usuario: str | None = None,
+) -> None:
+    usuario = normalize_username(usuario or current_user())
+    if not can_share_cliente(int(empresa_id), usuario):
+        log_permission_denied("COMPARTILHAR_CLIENTE", "empresas", int(empresa_id))
+        raise PermissionError("Voce nao tem permissao para compartilhar este cliente.")
+    row = empresa_row(int(empresa_id))
+    origem = normalize_username(row.get("contador_responsavel")) or usuario
+    destino = normalize_username(contador_destino)
+    if not destino or destino == origem:
+        raise ValueError("Selecione um contador destino diferente do responsavel.")
+    existing = query_df(
+        """
+        SELECT id FROM cliente_compartilhamentos
+         WHERE empresa_id=? AND UPPER(contador_origem)=UPPER(?) AND UPPER(contador_destino)=UPPER(?)
+         LIMIT 1
+        """,
+        (int(empresa_id), origem, destino),
+    )
+    if existing.empty:
+        execute(
+            """
+            INSERT INTO cliente_compartilhamentos
+                (empresa_id, contador_origem, contador_destino, pode_ver, pode_editar,
+                 pode_criar_demandas, criado_em, criado_por, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (int(empresa_id), origem, destino, 1 if pode_ver else 0, 1 if pode_editar else 0, 1 if pode_criar_demandas else 0, now_str(), usuario),
+        )
+    else:
+        execute(
+            """
+            UPDATE cliente_compartilhamentos
+               SET pode_ver=?, pode_editar=?, pode_criar_demandas=?, ativo=1
+             WHERE id=?
+            """,
+            (1 if pode_ver else 0, 1 if pode_editar else 0, 1 if pode_criar_demandas else 0, int(existing.iloc[0]["id"])),
+        )
+    execute("UPDATE empresas SET compartilhado=1, atualizado_em=? WHERE id=?", (now_str(), int(empresa_id)))
+
+
+def remover_compartilhamento_cliente(compartilhamento_id: int, usuario: str | None = None) -> None:
+    row_df = query_df("SELECT empresa_id FROM cliente_compartilhamentos WHERE id=?", (int(compartilhamento_id),))
+    if row_df.empty:
+        return
+    empresa_id = int(row_df.iloc[0]["empresa_id"])
+    if not can_share_cliente(empresa_id, usuario):
+        log_permission_denied("REMOVER_COMPART_CLIENTE", "empresas", empresa_id)
+        raise PermissionError("Voce nao tem permissao para remover compartilhamento.")
+    execute("UPDATE cliente_compartilhamentos SET ativo=0 WHERE id=?", (int(compartilhamento_id),))
+
+
+def load_cliente_estagiarios(empresa_id: int) -> pd.DataFrame:
+    return query_df(
+        """
+        SELECT id, empresa_id, contador_responsavel, estagiario_username,
+               COALESCE(pode_ver_cliente,1) AS pode_ver_cliente,
+               COALESCE(pode_ver_demandas,1) AS pode_ver_demandas,
+               COALESCE(pode_concluir_demandas,1) AS pode_concluir_demandas,
+               COALESCE(pode_comentar,1) AS pode_comentar,
+               COALESCE(ativo,1) AS ativo,
+               criado_em, COALESCE(criado_por,'') AS criado_por
+          FROM cliente_estagiarios
+         WHERE empresa_id=?
+         ORDER BY ativo DESC, estagiario_username
+        """,
+        (int(empresa_id),),
+    )
+
+
+def salvar_estagiario_cliente(
+    empresa_id: int,
+    estagiario_username: str,
+    pode_ver_cliente: bool,
+    pode_ver_demandas: bool,
+    pode_concluir_demandas: bool,
+    pode_comentar: bool,
+    usuario: str | None = None,
+) -> None:
+    usuario = normalize_username(usuario or current_user())
+    if not can_share_cliente(int(empresa_id), usuario):
+        log_permission_denied("VINCULAR_ESTAGIARIO", "empresas", int(empresa_id))
+        raise PermissionError("Voce nao tem permissao para vincular estagiario.")
+    row = empresa_row(int(empresa_id))
+    estagiario = normalize_username(estagiario_username)
+    if not estagiario:
+        raise ValueError("Selecione um estagiario.")
+    existing = query_df(
+        "SELECT id FROM cliente_estagiarios WHERE empresa_id=? AND UPPER(estagiario_username)=UPPER(?) LIMIT 1",
+        (int(empresa_id), estagiario),
+    )
+    params = (
+        int(empresa_id),
+        normalize_username(row.get("contador_responsavel")) or "DMLIMA",
+        estagiario,
+        1 if pode_ver_cliente else 0,
+        1 if pode_ver_demandas else 0,
+        1 if pode_concluir_demandas else 0,
+        1 if pode_comentar else 0,
+        now_str(),
+        usuario,
+    )
+    if existing.empty:
+        execute(
+            """
+            INSERT INTO cliente_estagiarios
+                (empresa_id, contador_responsavel, estagiario_username, pode_ver_cliente,
+                 pode_ver_demandas, pode_concluir_demandas, pode_comentar, criado_em, criado_por, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            params,
+        )
+    else:
+        execute(
+            """
+            UPDATE cliente_estagiarios
+               SET contador_responsavel=?, pode_ver_cliente=?, pode_ver_demandas=?,
+                   pode_concluir_demandas=?, pode_comentar=?, ativo=1
+             WHERE id=?
+            """,
+            (params[1], params[3], params[4], params[5], params[6], int(existing.iloc[0]["id"])),
+        )
+
+
+def remover_estagiario_cliente(vinculo_id: int, usuario: str | None = None) -> None:
+    row_df = query_df("SELECT empresa_id FROM cliente_estagiarios WHERE id=?", (int(vinculo_id),))
+    if row_df.empty:
+        return
+    empresa_id = int(row_df.iloc[0]["empresa_id"])
+    if not can_share_cliente(empresa_id, usuario):
+        log_permission_denied("REMOVER_ESTAGIARIO_CLIENTE", "empresas", empresa_id)
+        raise PermissionError("Voce nao tem permissao para remover vinculo.")
+    execute("UPDATE cliente_estagiarios SET ativo=0 WHERE id=?", (int(vinculo_id),))
 
 
 def tipos_padrao_por_empresa(empresa: dict) -> set[str]:
@@ -3973,6 +4764,7 @@ def gerar_demandas_por_config(competencia: str, usuario: str | None = None) -> d
             for tipo in sorted(tipos, key=lambda code: next((row["ordem"] for row in DEMAND_TYPE_ROWS if row["nome_curto"] == code), 999)):
                 created = create_demanda(int(empresa_dict["id"]), tipo, competencia, "config", responsavel=None)
                 report["criadas" if created else "existentes"] += 1
+            recalcular_liberacao_demandas(int(empresa_dict["id"]), competencia)
         except Exception as exc:
             report["erros"].append(f"{empresa.get('razao_social','')}: {exc}")
     log_action("Demandas", "GERAR_MES", "competencia", 0, usuario, json.dumps(report, ensure_ascii=False))
@@ -4057,12 +4849,16 @@ def load_demanda_comentarios(demanda_id: int) -> pd.DataFrame:
 
 
 def add_demanda_comentario(demanda_id: int, comentario: str, usuario: str | None = None) -> None:
+    usuario = usuario or current_user()
+    if not usuario_pode_ver_demanda(usuario, int(demanda_id)):
+        log_permission_denied("COMENTAR_DEMANDA", "demandas", int(demanda_id))
+        raise PermissionError("Voce nao tem permissao para comentar esta demanda.")
     comentario = str(comentario or "").strip()
     if not comentario:
         raise ValueError("Informe o comentario.")
     execute(
         "INSERT INTO demanda_comentarios (demanda_id, comentario, usuario, criado_em) VALUES (?, ?, ?, ?)",
-        (int(demanda_id), comentario, usuario or current_user(), now_str()),
+        (int(demanda_id), comentario, usuario, now_str()),
     )
 
 
@@ -4100,8 +4896,8 @@ def demand_order_value(tipo: str) -> int:
 
 def demandas_export_csv(df: pd.DataFrame) -> bytes:
     cols = [
-        "competencia", "empresa", "cnpj", "regime", "demanda", "status", "responsavel",
-        "prioridade", "data_limite", "observacao", "criado_em", "atualizado_em",
+        "competencia", "empresa", "cnpj", "regime", "contador_responsavel", "demanda",
+        "status", "liberacao", "bloqueio", "responsavel_operacional", "prioridade", "data_limite", "observacao", "criado_em", "atualizado_em",
         "concluida_em", "concluida_por",
     ]
     export_df = df.copy()
@@ -5477,6 +6273,91 @@ def render_editor_empresa(emp_id: int) -> None:
         l2.text_input("Copiar CNPJ", value=str(row.get("cnpj", "")), key=f"copy_cnpj_{emp_id}")
         l3.caption(f"Atualizado em: {row.get('atualizado_em', '')}")
 
+        st.markdown("##### Acessos e compartilhamentos")
+        current_contador = normalize_username(row.get("contador_responsavel", "DMLIMA")) or "DMLIMA"
+        st.caption(f"Contador responsavel atual: {current_contador}")
+        if is_admin_geral():
+            contadores = all_contadores()
+            novo_contador = st.selectbox(
+                "Trocar contador responsavel",
+                contadores,
+                index=contadores.index(current_contador) if current_contador in contadores else 0,
+                key=f"contador_resp_{emp_id}",
+            )
+            if st.button("Salvar contador responsavel", key=f"save_contador_resp_{emp_id}"):
+                save_empresa({"contador_responsavel": novo_contador}, int(emp_id))
+                execute(
+                    "UPDATE demandas SET contador_responsavel=? WHERE empresa_id=? AND (contador_responsavel IS NULL OR contador_responsavel='' OR contador_responsavel=?)",
+                    (normalize_username(novo_contador), int(emp_id), current_contador),
+                )
+                st.toast("Contador responsavel atualizado.")
+                st.rerun()
+
+        if can_share_cliente(int(emp_id)):
+            contadores_destino = [c for c in all_contadores() if c != current_contador]
+            with st.form(f"form_compartilhar_{emp_id}"):
+                destino = st.selectbox("Compartilhar com contador", contadores_destino or [""], key=f"share_dest_{emp_id}")
+                p1, p2, p3 = st.columns(3)
+                pode_ver = p1.checkbox("Pode ver", value=True, key=f"share_ver_{emp_id}")
+                pode_editar = p2.checkbox("Pode editar", value=False, key=f"share_editar_{emp_id}")
+                pode_criar = p3.checkbox("Pode criar demandas", value=False, key=f"share_criar_{emp_id}")
+                submit_share = st.form_submit_button("Salvar compartilhamento")
+            if submit_share:
+                salvar_compartilhamento_cliente(int(emp_id), destino, pode_ver, pode_editar, pode_criar, current_user())
+                st.toast("Compartilhamento salvo.")
+                st.rerun()
+
+        compartilhamentos = load_cliente_compartilhamentos(int(emp_id))
+        if not compartilhamentos.empty:
+            show_table(
+                compartilhamentos[["id", "contador_origem", "contador_destino", "pode_ver", "pode_editar", "pode_criar_demandas", "ativo"]],
+                key=f"compart_{emp_id}",
+                auto_height=True,
+                row_height=28,
+                editable=False,
+            )
+            if can_share_cliente(int(emp_id)):
+                ativos = compartilhamentos[compartilhamentos["ativo"].astype(int) == 1]
+                if not ativos.empty:
+                    remove_id = st.selectbox("Remover compartilhamento", ativos["id"].astype(int).tolist(), format_func=lambda cid: f"#{cid}")
+                    if st.button("Remover compartilhamento selecionado", key=f"remove_share_{emp_id}"):
+                        remover_compartilhamento_cliente(int(remove_id), current_user())
+                        st.toast("Compartilhamento removido.")
+                        st.rerun()
+
+        st.markdown("##### Estagiarios vinculados")
+        if can_share_cliente(int(emp_id)):
+            estagiarios = all_estagiarios()
+            with st.form(f"form_estagiario_{emp_id}"):
+                estagiario = st.selectbox("Estagiario", estagiarios or [""], key=f"estag_dest_{emp_id}")
+                e1, e2, e3, e4 = st.columns(4)
+                ver_cliente = e1.checkbox("Ver cliente", value=True, key=f"estag_ver_cli_{emp_id}")
+                ver_demandas = e2.checkbox("Ver demandas", value=True, key=f"estag_ver_dem_{emp_id}")
+                concluir_dem = e3.checkbox("Concluir demandas", value=True, key=f"estag_concluir_{emp_id}")
+                comentar = e4.checkbox("Comentar", value=True, key=f"estag_comentar_{emp_id}")
+                submit_est = st.form_submit_button("Salvar vinculo")
+            if submit_est:
+                salvar_estagiario_cliente(int(emp_id), estagiario, ver_cliente, ver_demandas, concluir_dem, comentar, current_user())
+                st.toast("Estagiario vinculado.")
+                st.rerun()
+        estagiarios_df = load_cliente_estagiarios(int(emp_id))
+        if not estagiarios_df.empty:
+            show_table(
+                estagiarios_df[["id", "estagiario_username", "pode_ver_cliente", "pode_ver_demandas", "pode_concluir_demandas", "pode_comentar", "ativo"]],
+                key=f"estagiarios_{emp_id}",
+                auto_height=True,
+                row_height=28,
+                editable=False,
+            )
+            if can_share_cliente(int(emp_id)):
+                ativos_est = estagiarios_df[estagiarios_df["ativo"].astype(int) == 1]
+                if not ativos_est.empty:
+                    remove_est_id = st.selectbox("Remover estagiario", ativos_est["id"].astype(int).tolist(), format_func=lambda cid: f"#{cid}")
+                    if st.button("Remover estagiario selecionado", key=f"remove_estag_{emp_id}"):
+                        remover_estagiario_cliente(int(remove_est_id), current_user())
+                        st.toast("Vinculo removido.")
+                        st.rerun()
+
         st.markdown("##### Demandas vinculadas")
         selected_tipos = load_empresa_demandas(int(emp_id))
         cols = st.columns(3)
@@ -5500,6 +6381,8 @@ def render_editor_empresa(emp_id: int) -> None:
 
 def render_empresas() -> None:
     st.markdown("**Empresas**")
+    if is_estagiario():
+        st.caption("Voce visualiza apenas clientes vinculados ao seu usuario.")
 
     if msg := st.session_state.pop("empresa_save_notice", None):
         st.toast(msg, icon="✅")
@@ -5530,13 +6413,36 @@ def render_empresas() -> None:
     inject_scroll_keeper("empresas")
 
     with st.container(border=True):
-        c1, c2, c3, c4, c5, c6, c7 = st.columns([1.8, 1.0, 1.2, 0.7, 0.8, 0.8, 0.8])
+        c1, c2, cscope, c3, c4, c5, c6, c7 = st.columns([1.6, 1.0, 1.1, 1.2, 0.7, 0.8, 0.8, 0.8])
         search = c1.text_input(BUTTON_LABELS["buscar"], value=st.session_state.get("empresa_search", ""), label_visibility="collapsed", placeholder=BUTTON_LABELS["buscar"])
         st.session_state["empresa_search"] = search
         regime_filter = c2.selectbox("Regime", ["📋 Todos", *REGIMES], index=0, label_visibility="collapsed")
+        if is_admin_geral():
+            scope_options = ["Todos", "Meus clientes", "Compartilhados comigo"]
+        elif is_contador():
+            scope_options = ["Meus clientes", "Compartilhados comigo"]
+        else:
+            scope_options = ["Vinculados a mim"]
+        scope_filter = cscope.selectbox("Escopo", scope_options, index=0, label_visibility="collapsed")
 
         empresas = load_empresas(active_only=False)
         filtered = empresas.copy()
+        username = current_username()
+        if scope_filter == "Meus clientes":
+            filtered = filtered[filtered["contador_responsavel"].astype(str).str.upper() == username]
+        elif scope_filter == "Compartilhados comigo":
+            shared_ids = query_df(
+                """
+                SELECT empresa_id
+                  FROM cliente_compartilhamentos
+                 WHERE UPPER(contador_destino)=UPPER(?)
+                   AND COALESCE(ativo,1)=1
+                   AND COALESCE(pode_ver,1)=1
+                """,
+                (username,),
+            )
+            ids = set(shared_ids["empresa_id"].astype(int).tolist()) if not shared_ids.empty else set()
+            filtered = filtered[filtered["id"].astype(int).isin(ids)] if ids else filtered.iloc[0:0]
         if search:
             q = search.strip().lower()
             mask = (
@@ -5553,10 +6459,11 @@ def render_empresas() -> None:
         else:
             filtered = filtered[filtered["is_ativo"] == 1]
 
-        display_df = filtered[["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "mensalidade", "cidade", "uf"]].copy() if not filtered.empty else filtered
+        display_cols = ["id", "cnpj", "razao_social", "nome_fantasia", "apelido", "regime", "contador_responsavel", "mensalidade", "cidade", "uf"]
+        display_df = filtered[display_cols].copy() if not filtered.empty else filtered
         export_df = display_df if not display_df.empty else filtered
 
-        if c3.button(BUTTON_LABELS["incluir_cnpj"], key="btn_empresas_incluir_cnpj", type="primary", use_container_width=True):
+        if c3.button(BUTTON_LABELS["incluir_cnpj"], key="btn_empresas_incluir_cnpj", type="primary", use_container_width=True, disabled=is_estagiario()):
             st.session_state["show_cadastro_on"] = True
             st.session_state["empresa_cadastro_on_mode"] = "lookup"
             st.session_state["empresa_cadastro_on_error"] = ""
@@ -5652,7 +6559,7 @@ def render_empresas() -> None:
         height=table_height,
         auto_height=True,
         editable=editable_mode,
-        disabled=["id"],
+        disabled=["id", "contador_responsavel"],
         row_height=35,
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
@@ -5661,6 +6568,7 @@ def render_empresas() -> None:
             "nome_fantasia": st.column_config.TextColumn("nome_fantasia", width=140),
             "apelido": st.column_config.TextColumn("apelido", width=120),
             "regime": st.column_config.SelectboxColumn("Regime", options=REGIMES, width=120),
+            "contador_responsavel": st.column_config.TextColumn("contador", width=120),
             "mensalidade": st.column_config.TextColumn("mensalidade", width=100),
             "cidade": st.column_config.TextColumn("cidade", width=100),
             "uf": st.column_config.TextColumn("uf", width=50),
@@ -5708,6 +6616,9 @@ def clear_novo_cliente_cadastro_on_state() -> None:
 def render_novo_cliente() -> None:
     st.subheader("Novo cliente")
     st.caption("Preencha os campos abaixo para criar um novo cadastro.")
+    if is_estagiario():
+        st.warning("Seu perfil nao permite cadastrar cliente.")
+        return
 
     if "novo_cliente_on_lookup" not in st.session_state:
         st.session_state["novo_cliente_on_lookup"] = ""
@@ -5764,6 +6675,13 @@ def render_novo_cliente() -> None:
             mei_optante = c2.checkbox("MEI optante", value=int(prefill.get("mei_optante", 0) or 0) == 1)
             mensalidade = c1.text_input("Mensalidade", value=_first_filled(prefill.get("mensalidade", "")))
             inativo = c2.checkbox("Inativa", value=int(prefill.get("inativo", 0) or 0) == 1)
+            contador_responsavel = "DMLIMA"
+            if is_admin_geral():
+                contadores = all_contadores()
+                contador_responsavel = c1.selectbox("Contador responsavel", contadores, index=contadores.index("DMLIMA") if "DMLIMA" in contadores else 0)
+            elif is_contador():
+                contador_responsavel = current_username()
+                c1.text_input("Contador responsavel", value=contador_responsavel, disabled=True)
             csave, ccancel = st.columns(2)
             save_new = csave.form_submit_button(f"{BUTTON_LABELS['salvar']} novo")
             cancel_new = ccancel.form_submit_button(BUTTON_LABELS["voltar"])
@@ -5797,6 +6715,7 @@ def render_novo_cliente() -> None:
                             "mei_optante": 1 if mei_optante else 0,
                             "mensalidade": mensalidade,
                             "inativo": inativo,
+                            "contador_responsavel": contador_responsavel,
                         },
                         None,
                     )
@@ -5831,10 +6750,18 @@ def render_demandas(competencia: str) -> None:
     if current_username() and current_username() not in responsaveis:
         responsaveis.append(current_username())
 
-    h1, h2, h3 = st.columns([1, 1, 1])
+    shared_count = 0
+    if is_contador() and current_username():
+        shared_df = query_df(
+            "SELECT COUNT(*) AS total FROM cliente_compartilhamentos WHERE UPPER(contador_destino)=UPPER(?) AND COALESCE(ativo,1)=1 AND COALESCE(pode_ver,1)=1",
+            (current_username(),),
+        )
+        shared_count = int(shared_df.iloc[0]["total"] or 0) if not shared_df.empty else 0
+    h1, h2, h3, h4 = st.columns([1, 1, 1, 1])
     h1.metric("Competencia", competencia)
     h2.metric("Banco", "Supabase PostgreSQL" if using_postgres() else "SQLite local")
     h3.metric("Empresas ativas", len(empresas))
+    h4.metric("Compartilhados", shared_count)
 
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns([1.1, 1.4, 1, 1])
@@ -5849,23 +6776,28 @@ def render_demandas(competencia: str) -> None:
         status_filter = f4.selectbox("Status", ["Todos", *DEMANDA_STATUS], format_func=lambda s: "Todos" if s == "Todos" else DEMANDA_STATUS_LABELS.get(s, s), key="dem_status_filter")
 
         f5, f6, f7, f8 = st.columns([1, 1, 1, 1])
-        responsavel_filter = f5.selectbox("Responsavel", ["Todos", *responsaveis], key="dem_responsavel_filter")
+        responsavel_filter = f5.selectbox("Responsavel operacional", ["Todos", *responsaveis], key="dem_responsavel_filter")
         prioridade_filter = f6.selectbox("Prioridade", ["Todos", *DEMANDA_PRIORIDADES], key="dem_prioridade_filter")
         regimes = ["Todos"] + sorted([r for r in empresas["regime"].fillna("").astype(str).unique().tolist() if r])
         regime_filter = f7.selectbox("Regime", regimes, key="dem_regime_filter")
         minhas_default = is_estagiario()
         minhas = f8.checkbox("Apenas minhas", value=bool(st.session_state.get("dem_minhas", minhas_default)), key="dem_minhas")
-        c9, c10 = st.columns([1, 1])
+        c9, c10, c11, c12 = st.columns([1, 1, 1, 1])
         atrasadas = c9.checkbox("Mostrar atrasadas", key="dem_atrasadas")
         mostrar_concluidas = c10.checkbox("Mostrar concluidas/canceladas", value=True, key="dem_mostrar_concluidas")
+        contadores_filtro = ["Todos"] + sorted([c for c in empresas["contador_responsavel"].fillna("").astype(str).str.upper().unique().tolist() if c])
+        contador_filter = c11.selectbox("Contador", contadores_filtro, key="dem_contador_filter")
+        liberada_filter = c12.selectbox("Liberacao", ["Todos", "Liberada", "Bloqueada"], key="dem_liberada_filter")
 
     filtros = {
         "busca": busca,
         "tipo": "" if tipo_filter == "Todos" else tipo_filter,
         "status": "" if status_filter == "Todos" else status_filter,
         "responsavel": "" if responsavel_filter == "Todos" else responsavel_filter,
+        "contador_responsavel": "" if contador_filter == "Todos" else contador_filter,
         "prioridade": "" if prioridade_filter == "Todos" else prioridade_filter,
         "regime": "" if regime_filter == "Todos" else regime_filter,
+        "liberada": "" if liberada_filter == "Todos" else liberada_filter,
         "minhas": minhas,
         "atrasadas": atrasadas,
         "mostrar_concluidas": mostrar_concluidas,
@@ -5972,24 +6904,28 @@ def render_demandas(competencia: str) -> None:
             key="demanda_selected_top_id",
         )
         top_row = demandas[demandas["demanda_id"] == int(selected_top)].iloc[0].to_dict()
+        top_liberada = int_flag(top_row.get("liberada"), 1) == 1
+        top_can_concluir = usuario_pode_concluir_demanda(current_user(), int(selected_top)) and top_liberada
+        if not top_liberada:
+            st.warning(str(top_row.get("motivo_bloqueio") or "Demanda bloqueada por dependencia."))
         q1, q2, q3, q4, q5, q6 = st.columns(6)
-        if q1.button("Concluir", key=f"top_concluir_{selected_top}"):
+        if q1.button("Concluir", key=f"top_concluir_{selected_top}", disabled=not top_can_concluir):
             concluir_demanda(int(selected_top), current_user())
             st.toast("Demanda concluida.")
             st.rerun()
-        if q2.button("Iniciar", key=f"top_iniciar_{selected_top}"):
+        if q2.button("Iniciar", key=f"top_iniciar_{selected_top}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_top))):
             update_demanda_status(int(selected_top), "em_andamento", current_user())
             st.toast("Demanda em andamento.")
             st.rerun()
-        if q3.button("Aguardar cliente", key=f"top_aguardar_cliente_{selected_top}"):
+        if q3.button("Aguardar cliente", key=f"top_aguardar_cliente_{selected_top}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_top))):
             update_demanda_status(int(selected_top), "aguardando_cliente", current_user())
             st.toast("Marcada como aguardando cliente.")
             st.rerun()
-        if q4.button("Aguardar doc.", key=f"top_aguardar_doc_{selected_top}"):
+        if q4.button("Aguardar doc.", key=f"top_aguardar_doc_{selected_top}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_top))):
             update_demanda_status(int(selected_top), "aguardando_documento", current_user())
             st.toast("Marcada como aguardando documento.")
             st.rerun()
-        if q5.button("Reabrir", key=f"top_reabrir_{selected_top}"):
+        if q5.button("Reabrir", key=f"top_reabrir_{selected_top}", disabled=not usuario_pode_concluir_demanda(current_user(), int(selected_top))):
             reabrir_demanda(int(selected_top), current_user())
             st.toast("Demanda reaberta.")
             st.rerun()
@@ -6034,13 +6970,13 @@ def render_demandas(competencia: str) -> None:
                     st.rerun()
 
         table_df = demandas[[
-            "demanda_id", "empresa", "cnpj", "regime", "demanda", "status_label",
-            "responsavel", "prioridade", "data_limite", "observacao", "atualizado_em",
-            "concluida_em", "concluida_por",
-        ]].rename(columns={"demanda_id": "id", "status_label": "status"})
+            "demanda_id", "empresa", "cnpj", "regime", "contador_responsavel", "demanda",
+            "status_label", "liberacao", "bloqueio", "responsavel_operacional", "prioridade",
+            "data_limite", "observacao", "atualizado_em", "concluida_em", "concluida_por",
+        ]].rename(columns={"demanda_id": "id", "status_label": "status", "responsavel_operacional": "responsavel"})
         show_table(
             table_df,
-            key=f"demandas_operacionais_{competencia_filtro}_{tipo_filter}_{status_filter}_{responsavel_filter}_{prioridade_filter}_{regime_filter}_{minhas}_{atrasadas}_{mostrar_concluidas}",
+            key=f"demandas_operacionais_{competencia_filtro}_{tipo_filter}_{status_filter}_{responsavel_filter}_{prioridade_filter}_{regime_filter}_{contador_filter}_{liberada_filter}_{minhas}_{atrasadas}_{mostrar_concluidas}",
             editable=False,
             disabled=True,
             auto_height=True,
@@ -6051,8 +6987,11 @@ def render_demandas(competencia: str) -> None:
                 "empresa": st.column_config.TextColumn("Empresa", width=210),
                 "cnpj": st.column_config.TextColumn("CNPJ", width=150),
                 "regime": st.column_config.TextColumn("Regime", width=130),
+                "contador_responsavel": st.column_config.TextColumn("Contador", width=110),
                 "demanda": st.column_config.TextColumn("Demanda", width=250),
                 "status": st.column_config.TextColumn("Status", width=150),
+                "liberacao": st.column_config.TextColumn("Liberada", width=110),
+                "bloqueio": st.column_config.TextColumn("Bloqueio", width=240),
                 "responsavel": st.column_config.TextColumn("Responsavel", width=120),
                 "prioridade": st.column_config.TextColumn("Prioridade", width=100),
                 "data_limite": st.column_config.TextColumn("Data limite", width=110),
@@ -6073,25 +7012,27 @@ def render_demandas(competencia: str) -> None:
             key="demanda_selected_id",
         )
         selected_row = demandas[demandas["demanda_id"] == int(selected_id)].iloc[0].to_dict()
+        selected_liberada = int_flag(selected_row.get("liberada"), 1) == 1
+        selected_can_concluir = usuario_pode_concluir_demanda(current_user(), int(selected_id)) and selected_liberada
 
         b1, b2, b3, b4, b5, b6 = st.columns(6)
-        if b1.button("Concluir", key=f"concluir_{selected_id}"):
+        if b1.button("Concluir", key=f"concluir_{selected_id}", disabled=not selected_can_concluir):
             concluir_demanda(int(selected_id), current_user())
             st.toast("Demanda concluida.")
             st.rerun()
-        if b2.button("Iniciar", key=f"iniciar_{selected_id}"):
+        if b2.button("Iniciar", key=f"iniciar_{selected_id}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_id))):
             update_demanda_status(int(selected_id), "em_andamento", current_user())
             st.toast("Demanda em andamento.")
             st.rerun()
-        if b3.button("Aguardar cliente", key=f"aguardar_cliente_{selected_id}"):
+        if b3.button("Aguardar cliente", key=f"aguardar_cliente_{selected_id}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_id))):
             update_demanda_status(int(selected_id), "aguardando_cliente", current_user())
             st.toast("Marcada como aguardando cliente.")
             st.rerun()
-        if b4.button("Aguardar documento", key=f"aguardar_doc_{selected_id}"):
+        if b4.button("Aguardar documento", key=f"aguardar_doc_{selected_id}", disabled=not usuario_pode_ver_demanda(current_user(), int(selected_id))):
             update_demanda_status(int(selected_id), "aguardando_documento", current_user())
             st.toast("Marcada como aguardando documento.")
             st.rerun()
-        if b5.button("Reabrir", key=f"reabrir_{selected_id}"):
+        if b5.button("Reabrir", key=f"reabrir_{selected_id}", disabled=not usuario_pode_concluir_demanda(current_user(), int(selected_id))):
             reabrir_demanda(int(selected_id), current_user())
             st.toast("Demanda reaberta.")
             st.rerun()
