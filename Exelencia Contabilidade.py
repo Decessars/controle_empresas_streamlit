@@ -2228,7 +2228,7 @@ def show_table(
 def calc_empresas_table_height(num_rows: int, *, row_height: int = 35, max_height: int = 4000) -> int:
     header_height = 45
     padding = 20
-    min_height = 650
+    min_height = 260
     calc_height = header_height + padding + (max(num_rows, 0) * row_height)
     return max(min_height, min(calc_height, max_height))
 
@@ -4476,9 +4476,11 @@ def render_demandas(competencia: str) -> None:
     show_table(
         filtered[["id", "demanda", "razao_social", "cnpj", "status", "observacao", "atualizado_em"]],
         key=f"demandas_table_{competencia}_{tipo_filter}_{status_filter}",
-        height=360,
         editable=False,
         disabled=True,
+        auto_height=True,
+        row_height=28,
+        max_height=50000,
         column_config={
             "id": st.column_config.NumberColumn("id", width=60),
             "demanda": st.column_config.TextColumn("Demanda", width=220),
