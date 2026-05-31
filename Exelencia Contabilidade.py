@@ -471,7 +471,7 @@ def apply_nexus_theme() -> None:
             font-weight: 900;
             color: var(--nexus-text);
             margin: 0 0 6px 0;
-            letter-spacing: -0.03em;
+            letter-spacing: 0;
         }
         .login-subtitle {
             color: var(--nexus-muted);
@@ -479,7 +479,8 @@ def apply_nexus_theme() -> None:
             margin-bottom: 18px;
             max-width: 34ch;
         }
-        .st-key-login_card {
+        .st-key-login_card,
+        .st-key-login_card_secure {
             width: min(392px, calc(100vw - 32px));
             margin: 8vh auto 0 auto;
             background:
@@ -492,14 +493,17 @@ def apply_nexus_theme() -> None:
                 0 24px 60px rgba(15,23,42,.12),
                 0 2px 0 rgba(255,255,255,.75) inset;
         }
-        .st-key-login_card div[data-testid="stForm"] {
+        .st-key-login_card div[data-testid="stForm"],
+        .st-key-login_card_secure div[data-testid="stForm"] {
             border: 0;
             padding: 0;
         }
-        .st-key-login_card input {
+        .st-key-login_card input,
+        .st-key-login_card_secure input {
             min-height: 40px;
         }
-        .st-key-login_card div[data-testid="stTextInputRootElement"] {
+        .st-key-login_card div[data-testid="stTextInputRootElement"],
+        .st-key-login_card_secure div[data-testid="stTextInputRootElement"] {
             margin-bottom: 0.35rem;
             background: #ffffff !important;
             border: 1px solid rgba(91,33,182,.18) !important;
@@ -507,25 +511,30 @@ def apply_nexus_theme() -> None:
             box-shadow: 0 1px 0 rgba(15,23,42,.03) inset;
             padding: 0.08rem 0.3rem !important;
         }
-        .st-key-login_card div[data-testid="stTextInputRootElement"]:focus-within {
+        .st-key-login_card div[data-testid="stTextInputRootElement"]:focus-within,
+        .st-key-login_card_secure div[data-testid="stTextInputRootElement"]:focus-within {
             border-color: rgba(91,33,182,.58) !important;
             box-shadow: 0 0 0 3px rgba(91,33,182,.12) !important;
         }
-        .st-key-login_card div[data-testid="stTextInputRootElement"] input {
+        .st-key-login_card div[data-testid="stTextInputRootElement"] input,
+        .st-key-login_card_secure div[data-testid="stTextInputRootElement"] input {
             background: transparent !important;
             border: 0 !important;
             box-shadow: none !important;
             padding: 0.28rem 0.35rem !important;
             min-height: 30px !important;
         }
-        .st-key-login_card label {
+        .st-key-login_card label,
+        .st-key-login_card_secure label {
             margin-bottom: 0.14rem !important;
             font-weight: 700 !important;
             color: var(--nexus-text) !important;
             font-size: 13px !important;
         }
         .st-key-login_card .stButton > button,
-        .st-key-login_card div[data-testid="stFormSubmitButton"] button {
+        .st-key-login_card div[data-testid="stFormSubmitButton"] button,
+        .st-key-login_card_secure .stButton > button,
+        .st-key-login_card_secure div[data-testid="stFormSubmitButton"] button {
             width: 100%;
             min-height: 42px;
             border-radius: 12px;
@@ -537,7 +546,9 @@ def apply_nexus_theme() -> None:
             letter-spacing: 0.02em;
         }
         .st-key-login_card .stButton > button:hover,
-        .st-key-login_card div[data-testid="stFormSubmitButton"] button:hover {
+        .st-key-login_card div[data-testid="stFormSubmitButton"] button:hover,
+        .st-key-login_card_secure .stButton > button:hover,
+        .st-key-login_card_secure div[data-testid="stFormSubmitButton"] button:hover {
             filter: brightness(1.03);
             transform: translateY(-1px);
         }
@@ -679,10 +690,10 @@ def apply_nexus_theme() -> None:
             margin-bottom: 10px;
         }
         .launcher-grid-wrap {
-            max-width: 1160px;
+            max-width: 920px;
         }
         .module-card {
-            min-height: 146px;
+            min-height: 132px;
             padding: 16px 16px 14px;
             margin-bottom: 16px;
             background: #ffffff;
@@ -858,8 +869,25 @@ def navigate_to(page: str, label: str | None = None, push_history: bool = True) 
         label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == page), page)
     st.session_state["page"] = page
     st.session_state["page_label"] = label
+    st.session_state["menu_secure"] = label
     st.query_params["page"] = page
     st.rerun()
+
+
+def set_navigation_target(page: str, label: str | None = None, push_history: bool = True) -> None:
+    page = normalize_page(page)
+    current = str(st.session_state.get("page") or "").strip()
+    if push_history and current and current != page:
+        history = st.session_state.setdefault("nav_history", [])
+        if not history or history[-1] != current:
+            history.append(current)
+        st.session_state["nav_history"] = history[-20:]
+    if label is None:
+        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == page), page)
+    st.session_state["page"] = page
+    st.session_state["page_label"] = label
+    st.session_state["menu_secure"] = label
+    st.query_params["page"] = page
 
 
 def go_back() -> None:
@@ -3481,6 +3509,54 @@ def render_usuarios() -> None:
 
 
 def render_modulos() -> None:
+    left_pad, content_col, right_pad = st.columns([0.12, 0.76, 0.12])
+    with content_col:
+        st.markdown(
+            """
+            <div class="launcher-shell">
+                <div class="launcher-kicker">Portal Principal | Selecao de modulo</div>
+                <div class="launcher-title">Acesso ao SISTEMA EXCELENCIA CONTABILIDADE</div>
+                <div class="launcher-subtitle">Selecione o ambiente de trabalho para iniciar sua operacao.</div>
+            </div>
+            <div class="launcher-grid-wrap">
+            """,
+            unsafe_allow_html=True,
+        )
+        for start in range(0, len(MODULES), 2):
+            cols = st.columns(2, gap="small")
+            for idx, item in enumerate(MODULES[start:start + 2]):
+                with cols[idx]:
+                    enabled = bool(item.get("enabled"))
+                    safe_key = str(item["title"]).replace(" ", "_").replace("/", "_")
+                    disabled_class = "" if enabled else " disabled"
+                    st.markdown(
+                        f"""
+                        <div class="module-card{disabled_class}">
+                            <div class="module-head">
+                                <span class="module-icon">{item['icon']}</span>
+                                <span class="module-title">{item['title']}</span>
+                                <span class="module-tag">{item['tag']}</span>
+                            </div>
+                            <div class="module-desc">{item['desc']}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    if enabled:
+                        target = normalize_page(str(item["page"]))
+                        label = next((menu_label for menu_label, menu_page in NAV_MENU.items() if menu_page == target), item["title"])
+                        st.button(
+                            "Acessar modulo",
+                            key=f"module_open_{safe_key}",
+                            use_container_width=False,
+                            on_click=set_navigation_target,
+                            args=(target, label),
+                        )
+                    else:
+                        st.button("Disponivel em breve", key=f"module_disabled_{safe_key}", disabled=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    return
+
     st.markdown(
         """
         <div class="launcher-shell">
