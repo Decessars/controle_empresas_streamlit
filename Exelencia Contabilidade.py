@@ -237,6 +237,15 @@ def apply_nexus_theme() -> None:
             padding-top: 0.45rem !important;
             padding-bottom: 0.45rem !important;
         }
+        section[data-testid="stSidebar"] .element-container {
+            margin-bottom: 0.18rem !important;
+        }
+        section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+            margin-bottom: 0 !important;
+        }
+        section[data-testid="stSidebar"] hr {
+            margin: 0.28rem 0 !important;
+        }
         section[data-testid="stSidebar"] {
             width: 16rem !important;
             min-width: 16rem !important;
@@ -246,14 +255,14 @@ def apply_nexus_theme() -> None:
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 8px 4px 14px 4px;
+            padding: 4px 2px 6px 2px;
         }
         .sidebar-logo img {
-            max-width: 120px !important;
+            max-width: 88px !important;
             height: auto !important;
             object-fit: contain !important;
             display: block;
-            margin: 0 auto 14px auto;
+            margin: 0 auto 4px auto;
         }
         section[data-testid="stSidebar"] {
             background:
@@ -781,7 +790,7 @@ def apply_nexus_theme() -> None:
     )
 
 
-def render_company_logo(width: int = 115, location: str = "sidebar") -> None:
+def render_company_logo(width: int = 86, location: str = "sidebar") -> None:
     if LOGO_PATH.exists():
         logo_bytes = LOGO_PATH.read_bytes()
         logo_b64 = base64.b64encode(logo_bytes).decode("ascii")
@@ -3336,10 +3345,11 @@ def render_sidebar_secure() -> tuple[str, str]:
 
     with st.sidebar:
         render_company_logo()
-        st.markdown(f"**Usuário:** {current_user_display_name()}")
-        st.caption(f"Perfil: {user_role_label(current_user_role())}")
-        active_now = load_active_sessions()
-        st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
+        st.markdown(
+            f"<div style='margin:0.15rem 0 0.1rem 0; line-height:1.15;'><strong>Usuário:</strong> {current_user_display_name()}</div>"
+            f"<div style='margin:0 0 0.2rem 0; line-height:1.1; color:var(--nexus-muted); font-size:0.92rem;'>Perfil: {user_role_label(current_user_role())}</div>",
+            unsafe_allow_html=True,
+        )
         page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
@@ -3366,10 +3376,7 @@ def render_sidebar_secure() -> tuple[str, str]:
             set_setting("ultima_competencia", competencia)
         touch_active_session(page)
         active_now = load_active_sessions()
-        st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
-        if not active_now.empty:
-            names = ", ".join(active_now["usuario"].drop_duplicates().tolist()[:4])
-            st.caption(names)
+        st.caption(f"Online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
     return page, competencia
 
 
