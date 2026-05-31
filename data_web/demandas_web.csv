@@ -5,18 +5,18 @@
 101022,62,ALAN (ONLINE),58.819.794/0001-08,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:37
 101071,76,ALAN (PADEIRO),26.885.664/0001-79,2026-05,OUTRA,21 - Outra Demanda,21 - Outra Demanda,pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
 100933,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
-101061,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-101062,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-101063,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
-101064,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+101061,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+101062,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+101063,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+101064,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
 101065,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
 101066,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
 101067,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
 101068,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:40
-101070,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
-70071,73,AMAURI,59.771.624/0001-55,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-70072,73,AMAURI,59.771.624/0001-55,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-70073,73,AMAURI,59.771.624/0001-55,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+101070,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-05,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+70071,73,AMAURI,59.771.624/0001-55,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+70072,73,AMAURI,59.771.624/0001-55,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+70073,73,AMAURI,59.771.624/0001-55,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
 70074,73,AMAURI,59.771.624/0001-55,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:41
 70075,73,AMAURI,59.771.624/0001-55,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:41
 70076,73,AMAURI,59.771.624/0001-55,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:41
@@ -30,14 +30,14 @@
 93197,48,CARLOS ALBERTO,11.858.043/0001-29,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
 93198,48,CARLOS ALBERTO,11.858.043/0001-29,2026-05,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
 93199,48,CARLOS ALBERTO,11.858.043/0001-29,2026-05,OUTRA,21 - Outra Demanda,21 - Outra Demanda,pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
-71016,80,CAROL,45.533.719/0001-26,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-71017,80,CAROL,45.533.719/0001-26,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-71018,80,CAROL,45.533.719/0001-26,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
-71019,80,CAROL,45.533.719/0001-26,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+71016,80,CAROL,45.533.719/0001-26,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+71017,80,CAROL,45.533.719/0001-26,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+71018,80,CAROL,45.533.719/0001-26,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+71019,80,CAROL,45.533.719/0001-26,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
 71020,80,CAROL,45.533.719/0001-26,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:42
 71021,80,CAROL,45.533.719/0001-26,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:42
 71022,80,CAROL,45.533.719/0001-26,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:42
-71023,80,CAROL,45.533.719/0001-26,2026-05,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+71023,80,CAROL,45.533.719/0001-26,2026-05,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
 83784,70,CLECIO,58.859.439/0001-54,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:42
 83785,70,CLECIO,58.859.439/0001-54,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:43
 83786,70,CLECIO,58.859.439/0001-54,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:43
@@ -68,13 +68,13 @@
 76215,85,DOJO,30.819.199/0001-45,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:43
 76216,85,DOJO,30.819.199/0001-45,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:43
 76217,85,DOJO,30.819.199/0001-45,2026-05,PARC_IMPOSTOS,19 - Parcelamento de Impostos (outro),19 - Parcelamento de Impostos (outro),pendente,,,,,,,0.0,0,,2026-05-31 01:01:43
-71848,82,DOUGLAS,60.392.653/0001-95,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-71849,82,DOUGLAS,60.392.653/0001-95,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
-71850,82,DOUGLAS,60.392.653/0001-95,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
-71851,82,DOUGLAS,60.392.653/0001-95,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
-71852,82,DOUGLAS,60.392.653/0001-95,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
-71853,82,DOUGLAS,60.392.653/0001-95,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
-81519,82,DOUGLAS,60.392.653/0001-95,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+71848,82,DOUGLAS,60.392.653/0001-95,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+71849,82,DOUGLAS,60.392.653/0001-95,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+71850,82,DOUGLAS,60.392.653/0001-95,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+71851,82,DOUGLAS,60.392.653/0001-95,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+71852,82,DOUGLAS,60.392.653/0001-95,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+71853,82,DOUGLAS,60.392.653/0001-95,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
+81519,82,DOUGLAS,60.392.653/0001-95,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,EDIVAN,EDIVAN,,[Responsável: Edivan],,,0.0,0,,2026-05-31 14:11:20
 81597,89,EDINHO,19.717.656/0001-58,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
 81598,89,EDINHO,19.717.656/0001-58,2026-05,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
 81599,89,EDINHO,19.717.656/0001-58,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:33
@@ -124,10 +124,10 @@
 85323,67,MANUEL CORREIA,19.841.897/0001-04,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
 85324,67,MANUEL CORREIA,19.841.897/0001-04,2026-05,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
 85325,67,MANUEL CORREIA,19.841.897/0001-04,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
-76602,77,MARCELA,48.634.850/0001-78,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-76603,77,MARCELA,48.634.850/0001-78,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-76604,77,MARCELA,48.634.850/0001-78,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
-76605,77,MARCELA,48.634.850/0001-78,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+76602,77,MARCELA,48.634.850/0001-78,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+76603,77,MARCELA,48.634.850/0001-78,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+76604,77,MARCELA,48.634.850/0001-78,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+76605,77,MARCELA,48.634.850/0001-78,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
 76607,77,MARCELA,48.634.850/0001-78,2026-05,APUR_ISS,07 - Apuração ISS,07 - Apuração ISS,pendente,,,,,,,0.0,0,,2026-05-31 01:01:45
 76608,77,MARCELA,48.634.850/0001-78,2026-05,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:45
 76609,77,MARCELA,48.634.850/0001-78,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:45
@@ -149,17 +149,17 @@
 101050,61,MIRAUHY,61.710.413/0001-54,2026-05,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:39
 101051,61,MIRAUHY,61.710.413/0001-54,2026-05,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:39
 101052,61,MIRAUHY,61.710.413/0001-54,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:39
-100982,47,NATHALIA,51.586.195/0001-34,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-100983,47,NATHALIA,51.586.195/0001-34,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-100984,47,NATHALIA,51.586.195/0001-34,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+100982,47,NATHALIA,51.586.195/0001-34,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+100983,47,NATHALIA,51.586.195/0001-34,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+100984,47,NATHALIA,51.586.195/0001-34,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
 100985,47,NATHALIA,51.586.195/0001-34,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
 100986,47,NATHALIA,51.586.195/0001-34,2026-05,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
 100987,47,NATHALIA,51.586.195/0001-34,2026-05,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
 100988,47,NATHALIA,51.586.195/0001-34,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:35
 82905,44,NIEDJA,50.140.098/0001-50,2026-05,OUTRA,21 - Outra Demanda,21 - Outra Demanda,pendente,,,,,,,0.0,0,,2026-05-31 01:01:34
-68752,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-68753,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-68754,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+68752,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+68753,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+68754,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
 68755,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
 68756,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
 85400,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
@@ -167,10 +167,10 @@
 86955,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
 86956,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,CONS_ICMS_ST,14 - Consulta ICMS-ST (SEFAZ),14 - Consulta ICMS-ST (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
 86958,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-05,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,pendente,,,,,,,0.0,0,,2026-05-31 01:01:47
-68861,75,RALLY PENEUS,11.105.754/0001-22,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-68862,75,RALLY PENEUS,11.105.754/0001-22,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-68863,75,RALLY PENEUS,11.105.754/0001-22,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
-68864,75,RALLY PENEUS,11.105.754/0001-22,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
+68861,75,RALLY PENEUS,11.105.754/0001-22,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+68862,75,RALLY PENEUS,11.105.754/0001-22,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+68863,75,RALLY PENEUS,11.105.754/0001-22,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+68864,75,RALLY PENEUS,11.105.754/0001-22,2026-05,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:10:57
 68865,75,RALLY PENEUS,11.105.754/0001-22,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:41
 68866,75,RALLY PENEUS,11.105.754/0001-22,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:41
 68867,75,RALLY PENEUS,11.105.754/0001-22,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:42
@@ -181,9 +181,9 @@
 74839,50,SAMUEL,58.739.611/0001-36,2026-05,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:37
 74840,50,SAMUEL,58.739.611/0001-36,2026-05,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,pendente,,,,,,,0.0,0,,2026-05-31 01:01:37
 74842,50,SAMUEL,58.739.611/0001-36,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:37
-65575,79,SILVANDO,56.313.775/0001-71,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-65576,79,SILVANDO,56.313.775/0001-71,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-65577,79,SILVANDO,56.313.775/0001-71,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+65575,79,SILVANDO,56.313.775/0001-71,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+65576,79,SILVANDO,56.313.775/0001-71,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+65577,79,SILVANDO,56.313.775/0001-71,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
 65578,79,SILVANDO,56.313.775/0001-71,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:36
 65579,79,SILVANDO,56.313.775/0001-71,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:36
 65580,79,SILVANDO,56.313.775/0001-71,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:36
@@ -216,22 +216,22 @@
 93533,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:48
 93534,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-05,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,pendente,,,,,,,0.0,0,,2026-05-31 01:01:48
 93535,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-05,OUTRA,21 - Outra Demanda,21 - Outra Demanda,pendente,,,,,,,0.0,0,,2026-05-31 01:01:48
-85786,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
-85787,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,,,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
-85788,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,,,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
+85786,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 02:09:27
+85787,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,pendente,VITOR,VITOR,,[Responsável: Vitor],,,0.0,0,,2026-05-31 01:04:04
+85788,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,pendente,RAYANA,RAYANA,,[Responsável: Rayana],,,0.0,0,,2026-05-31 14:11:06
 85789,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,pendente,,,,,,,0.0,0,,2026-05-31 01:01:35
 85790,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,pendente,,,,,,,0.0,0,,2026-05-31 01:01:35
 85791,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,0.0,0,,2026-05-31 01:01:35
 85792,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,pendente,,,,,,,0.0,0,,2026-05-31 01:01:35
 85793,71,WESLEY (FISIO),55.605.484/0001-94,2026-05,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),pendente,,,,,,,0.0,0,,2026-05-31 01:01:36
 45910,62,ALAN (ONLINE),58.819.794/0001-08,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
-45911,62,ALAN (ONLINE),58.819.794/0001-08,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
+45911,62,ALAN (ONLINE),58.819.794/0001-08,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
 45912,62,ALAN (ONLINE),58.819.794/0001-08,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:47:54
 45913,62,ALAN (ONLINE),58.819.794/0001-08,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 46116,76,ALAN (PADEIRO),26.885.664/0001-79,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
 43746,69,ALEX,51.639.634/0001-20,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
 45609,69,ALEX,51.639.634/0001-20,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:02
-45974,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:09
+45974,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:09
 45975,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 45976,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,PAR SIMPLES,,,100.0,0,,2026-05-18 09:14:09
 45977,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
@@ -239,7 +239,7 @@
 45979,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PARCELAMENTO,,,100.0,0,,2026-05-18 09:14:10
 45980,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:04
 45981,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
-46106,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:09
+46106,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:09
 46115,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-04,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 45951,73,AMAURI,59.771.624/0001-55,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 45952,73,AMAURI,59.771.624/0001-55,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
@@ -247,11 +247,11 @@
 45954,73,AMAURI,59.771.624/0001-55,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PAGO! 1/2,,,100.0,0,,2026-05-18 09:14:10
 45955,73,AMAURI,59.771.624/0001-55,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:02
 45956,73,AMAURI,59.771.624/0001-55,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
-46117,73,AMAURI,59.771.624/0001-55,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
+46117,73,AMAURI,59.771.624/0001-55,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
 94824,103,ANDRE SEBASTIAO DA SILVA,65.221.711/0001-31,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 94825,103,ANDRE SEBASTIAO DA SILVA,65.221.711/0001-31,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
 45926,65,ANDREZA SANTOS,62.985.085/0001-61,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
-45927,65,ANDREZA SANTOS,62.985.085/0001-61,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:09
+45927,65,ANDREZA SANTOS,62.985.085/0001-61,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:09
 45928,65,ANDREZA SANTOS,62.985.085/0001-61,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:34:24
 45929,65,ANDREZA SANTOS,62.985.085/0001-61,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 45914,63,ANDRÉ SILVA,17.550.361/0001-04,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-13 08:57:28
@@ -266,10 +266,10 @@
 45990,80,CAROL,45.533.719/0001-26,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 45991,80,CAROL,45.533.719/0001-26,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,NÃO PARCELADO 2026,,,100.0,0,,2026-05-18 09:14:11
 45992,80,CAROL,45.533.719/0001-26,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:02
-46129,80,CAROL,45.533.719/0001-26,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
+46129,80,CAROL,45.533.719/0001-26,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
 46135,80,CAROL,45.533.719/0001-26,2026-04,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:11
 75129,80,CAROL,45.533.719/0001-26,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,PAR SIMPLES,,,100.0,0,,2026-05-18 09:14:11
-45936,70,CLECIO,58.859.439/0001-54,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Rayana],,,83.33,0,,2026-05-18 09:14:11
+45936,70,CLECIO,58.859.439/0001-54,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,83.33,0,,2026-05-18 09:14:11
 45937,70,CLECIO,58.859.439/0001-54,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,PAR SIMPLES,,,83.33,0,,2026-05-18 09:14:11
 45938,70,CLECIO,58.859.439/0001-54,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,pendente,,,,,,,83.33,0,,2026-05-18 09:14:11
 45939,70,CLECIO,58.859.439/0001-54,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,83.33,0,,2026-05-31 01:02:04
@@ -310,22 +310,22 @@
 90256,91,DANIEL (MERC CARVALHO),64.798.979/0001-78,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,,,,100.0,0,,2026-05-18 09:14:13
 90257,91,DANIEL (MERC CARVALHO),64.798.979/0001-78,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:13
 90262,91,DANIEL (MERC CARVALHO),64.798.979/0001-78,2026-04,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,100.0,0,,2026-05-31 01:03:20
-45918,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:08
+45918,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:08
 45919,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,CONS_ICMS_ST,14 - Consulta ICMS-ST (SEFAZ),14 - Consulta ICMS-ST (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:01:58
 45920,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 45921,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,NÃO PARCELADO 2026,,,100.0,0,,2026-05-18 09:14:09
-45922,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
+45922,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
 45923,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:04
 45924,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 45925,64,DIOGENES ORPHEO,60.103.160/0001-98,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
-42895,85,DOJO,30.819.199/0001-45,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:11
+42895,85,DOJO,30.819.199/0001-45,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:11
 42896,85,DOJO,30.819.199/0001-45,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,CODIGO IMOVEL 187359,,,100.0,0,,2026-05-18 09:14:11
 42897,85,DOJO,30.819.199/0001-45,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:34:22
 42898,85,DOJO,30.819.199/0001-45,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-18 09:14:11
 42899,85,DOJO,30.819.199/0001-45,2026-04,PARC_IMPOSTOS,19 - Parcelamento de Impostos (outro),19 - Parcelamento de Impostos (outro),concluida,,,,,,,100.0,0,,2026-05-18 09:14:11
-45993,82,DOUGLAS,60.392.653/0001-95,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:12
+45993,82,DOUGLAS,60.392.653/0001-95,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:12
 45994,82,DOUGLAS,60.392.653/0001-95,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:12
-45995,82,DOUGLAS,60.392.653/0001-95,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:12
+45995,82,DOUGLAS,60.392.653/0001-95,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:12
 45996,82,DOUGLAS,60.392.653/0001-95,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 46150,82,DOUGLAS,60.392.653/0001-95,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-05-18 09:14:11
 75148,82,DOUGLAS,60.392.653/0001-95,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-31 01:00:27
@@ -341,7 +341,7 @@
 46013,96,ELENISE (CLÉCIO),24.587.847/0001-82,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
 46014,96,ELENISE (CLÉCIO),24.587.847/0001-82,2026-04,PARC_MENSAL,18 - Parcelamento Mensal (impostos),18 - Parcelamento Mensal (impostos),concluida,,,,,,,100.0,0,,2026-05-31 01:03:26
 45893,56,ELLEN & EDUARDO,58.918.751/0001-71,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
-45894,56,ELLEN & EDUARDO,58.918.751/0001-71,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
+45894,56,ELLEN & EDUARDO,58.918.751/0001-71,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
 45895,56,ELLEN & EDUARDO,58.918.751/0001-71,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:53:56
 45896,56,ELLEN & EDUARDO,58.918.751/0001-71,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 80571,98,ERICA DA SILVA (MAURÍCIO),66.306.733/0001-67,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
@@ -350,8 +350,8 @@
 46158,74,EVERTON (DALMETAL),39.231.227/0001-83,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-11 11:27:52
 46163,86,FARMACIA LILIMEL,37.884.927/0001-41,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-07 15:08:10
 53475,97,FERNANDO,65.436.228/0001-74,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,85.71,0,,2026-05-31 01:02:03
-53478,97,FERNANDO,65.436.228/0001-74,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,85.71,0,,2026-05-18 09:14:12
-53479,97,FERNANDO,65.436.228/0001-74,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Rayana],,,85.71,0,,2026-05-18 09:14:12
+53478,97,FERNANDO,65.436.228/0001-74,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,85.71,0,,2026-05-18 09:14:12
+53479,97,FERNANDO,65.436.228/0001-74,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,85.71,0,,2026-05-18 09:14:12
 53480,97,FERNANDO,65.436.228/0001-74,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,NÃO PARCELADO 2026,,,85.71,0,,2026-05-18 09:14:12
 53481,97,FERNANDO,65.436.228/0001-74,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,85.71,0,,2026-05-18 09:14:12
 53483,97,FERNANDO,65.436.228/0001-74,2026-04,EMISSAO_NF,16 - Emissão NF,16 - Emissão NF,pendente,,,,,,,85.71,0,,2026-05-18 09:14:12
@@ -368,7 +368,7 @@
 46011,95,JORDANA,56.441.806/0001-70,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:31
 46012,95,JORDANA,56.441.806/0001-70,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 45864,46,JORGE,58.855.232/0001-01,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
-45865,46,JORGE,58.855.232/0001-01,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
+45865,46,JORGE,58.855.232/0001-01,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
 45866,46,JORGE,58.855.232/0001-01,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 45867,46,JORGE,58.855.232/0001-01,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 45903,59,LETICIA (ROBERTA),55.686.941/0001-12,2026-04,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,100.0,0,,2026-05-11 11:27:28
@@ -378,13 +378,13 @@
 45931,67,MANUEL CORREIA,19.841.897/0001-04,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45933,67,MANUEL CORREIA,19.841.897/0001-04,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45934,67,MANUEL CORREIA,19.841.897/0001-04,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-45114,77,MARCELA,48.634.850/0001-78,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:12
+45114,77,MARCELA,48.634.850/0001-78,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:12
 45115,77,MARCELA,48.634.850/0001-78,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:12
 45116,77,MARCELA,48.634.850/0001-78,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:12
 45117,77,MARCELA,48.634.850/0001-78,2026-04,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:13
-45118,77,MARCELA,48.634.850/0001-78,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-06 17:28:33
+45118,77,MARCELA,48.634.850/0001-78,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-06 17:28:33
 45119,77,MARCELA,48.634.850/0001-78,2026-04,APUR_ISS,07 - Apuração ISS,07 - Apuração ISS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:13
-45120,77,MARCELA,48.634.850/0001-78,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:13
+45120,77,MARCELA,48.634.850/0001-78,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:13
 45121,77,MARCELA,48.634.850/0001-78,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-31 01:00:32
 45122,77,MARCELA,48.634.850/0001-78,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:54:00
 45123,77,MARCELA,48.634.850/0001-78,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:04
@@ -396,28 +396,28 @@
 45887,54,MARKYS,59.248.822/0001-39,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:31
 45888,54,MARKYS,59.248.822/0001-39,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-07 14:39:25
 45889,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-45890,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
+45890,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
 45891,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45892,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 83682,100,MH BRASIL INCORPORADORA LTDA,66.432.472/0001-21,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-18 09:14:13
 83683,100,MH BRASIL INCORPORADORA LTDA,66.432.472/0001-21,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 83684,100,MH BRASIL INCORPORADORA LTDA,66.432.472/0001-21,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
 45906,61,MIRAUHY,61.710.413/0001-54,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
-45907,61,MIRAUHY,61.710.413/0001-54,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:09
+45907,61,MIRAUHY,61.710.413/0001-54,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:09
 45908,61,MIRAUHY,61.710.413/0001-54,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:44:58
 45909,61,MIRAUHY,61.710.413/0001-54,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:09
 45868,47,NATHALIA,51.586.195/0001-34,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45869,47,NATHALIA,51.586.195/0001-34,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45870,47,NATHALIA,51.586.195/0001-34,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-45871,47,NATHALIA,51.586.195/0001-34,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
+45871,47,NATHALIA,51.586.195/0001-34,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
 45872,47,NATHALIA,51.586.195/0001-34,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45873,47,NATHALIA,51.586.195/0001-34,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-46033,47,NATHALIA,51.586.195/0001-34,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:06
+46033,47,NATHALIA,51.586.195/0001-34,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:06
 45860,44,NIEDJA,50.140.098/0001-50,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45861,44,NIEDJA,50.140.098/0001-50,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-07 14:40:01
-46009,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Rayana],,,90.0,0,,2026-05-18 09:14:14
+46009,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,90.0,0,,2026-05-18 09:14:14
 46010,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,90.0,0,,2026-05-31 01:02:04
-69212,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,90.0,0,,2026-05-18 09:14:13
+69212,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,90.0,0,,2026-05-18 09:14:13
 69213,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,90.0,0,,2026-05-18 09:14:13
 69214,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,90.0,0,,2026-05-18 09:14:14
 86089,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,90.0,0,,2026-05-18 09:14:14
@@ -427,38 +427,38 @@
 87252,94,RAFAELA (Maragogi),62.522.575/0001-21,2026-04,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,90.0,0,,2026-05-31 01:03:20
 45957,75,RALLY PENEUS,11.105.754/0001-22,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 45958,75,RALLY PENEUS,11.105.754/0001-22,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PAGO! 1/2,,,100.0,0,,2026-05-18 09:14:10
-45959,75,RALLY PENEUS,11.105.754/0001-22,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:10
+45959,75,RALLY PENEUS,11.105.754/0001-22,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:10
 45960,75,RALLY PENEUS,11.105.754/0001-22,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:02
 45961,75,RALLY PENEUS,11.105.754/0001-22,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
-69147,75,RALLY PENEUS,11.105.754/0001-22,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
+69147,75,RALLY PENEUS,11.105.754/0001-22,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:10
 69148,75,RALLY PENEUS,11.105.754/0001-22,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 69149,75,RALLY PENEUS,11.105.754/0001-22,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 69150,75,RALLY PENEUS,11.105.754/0001-22,2026-04,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:10
 75121,75,RALLY PENEUS,11.105.754/0001-22,2026-04,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,PAR SIMPLES,,,100.0,0,,2026-05-18 09:14:10
 45877,50,SAMUEL,58.739.611/0001-36,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
-45878,50,SAMUEL,58.739.611/0001-36,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:07
+45878,50,SAMUEL,58.739.611/0001-36,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:07
 45879,50,SAMUEL,58.739.611/0001-36,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:50:44
 45880,50,SAMUEL,58.739.611/0001-36,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 75058,50,SAMUEL,58.739.611/0001-36,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-13 11:23:24
-45982,79,SILVANDO,56.313.775/0001-71,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:07
+45982,79,SILVANDO,56.313.775/0001-71,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:07
 45983,79,SILVANDO,56.313.775/0001-71,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 45984,79,SILVANDO,56.313.775/0001-71,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 45985,79,SILVANDO,56.313.775/0001-71,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PAGO! 1/2,,,100.0,0,,2026-05-18 09:14:07
 45986,79,SILVANDO,56.313.775/0001-71,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 45987,79,SILVANDO,56.313.775/0001-71,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
-46056,79,SILVANDO,56.313.775/0001-71,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:07
+46056,79,SILVANDO,56.313.775/0001-71,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:07
 85943,79,SILVANDO,56.313.775/0001-71,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
-46004,88,SUZANA,63.964.070/0001-80,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:11
+46004,88,SUZANA,63.964.070/0001-80,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:11
 46005,88,SUZANA,63.964.070/0001-80,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,NÃO PARCELADO 2026,,,100.0,0,,2026-05-18 09:14:11
 46006,88,SUZANA,63.964.070/0001-80,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 46007,88,SUZANA,63.964.070/0001-80,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:32:07
 86038,88,SUZANA,63.964.070/0001-80,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-18 09:14:11
-43248,57,TATIANE,59.315.033/0001-73,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
+43248,57,TATIANE,59.315.033/0001-73,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:08
 43249,57,TATIANE,59.315.033/0001-73,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 43250,57,TATIANE,59.315.033/0001-73,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 43251,57,TATIANE,59.315.033/0001-73,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:08
 45905,60,THALES (FERRO VELHO),28.847.818/0001-63,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-45947,72,THIAGO,53.132.944/0001-89,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:14
+45947,72,THIAGO,53.132.944/0001-89,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:14
 45948,72,THIAGO,53.132.944/0001-89,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PAGO! 1/2,,,100.0,0,,2026-05-18 09:14:14
 45949,72,THIAGO,53.132.944/0001-89,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 45950,72,THIAGO,53.132.944/0001-89,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:14:14
@@ -466,7 +466,7 @@
 45862,45,VALDERI,52.976.507/0001-89,2026-04,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,100.0,0,,2026-05-11 11:26:21
 45863,45,VALDERI,52.976.507/0001-89,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 45881,51,VANDA (RALLY),32.505.910/0001-12,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
-45882,51,VANDA (RALLY),32.505.910/0001-12,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
+45882,51,VANDA (RALLY),32.505.910/0001-12,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,RAYANA,RAYANA,,[Responsável: Rayana],,,100.0,0,,2026-05-18 09:14:06
 45883,51,VANDA (RALLY),32.505.910/0001-12,2026-04,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:06
 93748,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-04,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-18 09:14:14
 93749,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,NÃO PARCELADO ANTIGOS+2026,,,100.0,0,,2026-05-18 09:14:14
@@ -475,13 +475,13 @@
 93752,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 93753,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-04,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,100.0,0,,2026-05-31 01:03:20
 93754,102,WALLEY AGOSTINHO DOS SANTOS,14.391.186/0001-61,2026-04,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-31 01:03:30
-45941,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:07
+45941,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-18 09:14:07
 45942,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 45943,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 45944,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,PAGO! 1/2,,,100.0,0,,2026-05-18 09:14:07
 45945,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-31 01:02:03
 45946,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-18 09:51:04
-46046,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:07
+46046,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-18 09:14:07
 85932,71,WESLEY (FISIO),55.605.484/0001-94,2026-04,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-18 09:14:07
 4499,62,ALAN (ONLINE),58.819.794/0001-08,2026-03,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:57
 4500,62,ALAN (ONLINE),58.819.794/0001-08,2026-03,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:57
@@ -493,7 +493,7 @@
 4562,69,ALEX,51.639.634/0001-20,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-04-05 16:36:31
 4563,69,ALEX,51.639.634/0001-20,2026-03,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-04-05 16:39:53
 34479,69,ALEX,51.639.634/0001-20,2026-03,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-04-16 14:03:34
-4551,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:58
+4551,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:58
 4552,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 4553,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 4554,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
@@ -503,7 +503,7 @@
 4558,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,GUIA_FGTS_PARC,05 - Parc FGTS,05 - Parc FGTS,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 24665,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 34248,78,ALLYSSON (AJ BATISTA),48.957.642/0001-00,2026-03,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
-4565,73,AMAURI,59.771.624/0001-55,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:58
+4565,73,AMAURI,59.771.624/0001-55,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:58
 4566,73,AMAURI,59.771.624/0001-55,2026-03,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 4567,73,AMAURI,59.771.624/0001-55,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
 4568,73,AMAURI,59.771.624/0001-55,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-04 13:39:58
@@ -582,7 +582,7 @@
 32108,85,DOJO,30.819.199/0001-45,2026-03,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-04 13:39:59
 32111,85,DOJO,30.819.199/0001-45,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-06 13:42:44
 32112,85,DOJO,30.819.199/0001-45,2026-03,PARC_IMPOSTOS,19 - Parcelamento de Impostos (outro),19 - Parcelamento de Impostos (outro),concluida,,,,,,,100.0,0,,2026-05-06 13:42:44
-4580,82,DOUGLAS,60.392.653/0001-95,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:59
+4580,82,DOUGLAS,60.392.653/0001-95,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:59
 4581,82,DOUGLAS,60.392.653/0001-95,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-07 20:05:52
 13240,82,DOUGLAS,60.392.653/0001-95,2026-03,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-05-04 13:39:59
 13241,82,DOUGLAS,60.392.653/0001-95,2026-03,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-05-04 13:39:59
@@ -655,9 +655,9 @@ A PARTIR DE AGORA, EMITIR NF DE TODAS AS VENDAS",,,100.0,0,,2026-05-11 11:28:43
 12919,77,MARCELA,48.634.850/0001-78,2026-03,PARC_IMPOSTOS,19 - Parcelamento de Impostos (outro),19 - Parcelamento de Impostos (outro),concluida,,,,,,,100.0,0,,2026-05-04 15:13:13
 28029,77,MARCELA,48.634.850/0001-78,2026-03,APUR_ISS,07 - Apuração ISS,07 - Apuração ISS,concluida,,,,,,,100.0,0,,2026-05-04 13:40:00
 45406,77,MARCELA,48.634.850/0001-78,2026-03,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-05-04 13:40:00
-45407,77,MARCELA,48.634.850/0001-78,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
-45408,77,MARCELA,48.634.850/0001-78,2026-03,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
-45409,77,MARCELA,48.634.850/0001-78,2026-03,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,concluida,,,,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
+45407,77,MARCELA,48.634.850/0001-78,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
+45408,77,MARCELA,48.634.850/0001-78,2026-03,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
+45409,77,MARCELA,48.634.850/0001-78,2026-03,GUIA_FGTS,04 - Geração/Envio Guia FGTS,04 - Geração/Envio Guia FGTS,concluida,ESCRITÓRIO (VITOR),ESCRITÓRIO (VITOR),,[Responsável: Escritório (Vitor)],,,100.0,0,,2026-05-04 13:40:00
 4520,54,MARKYS,59.248.822/0001-39,2026-03,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-07 14:39:10
 34829,54,MARKYS,59.248.822/0001-39,2026-03,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-07 14:39:11
 4459,55,MAYARA (SAMUEL),53.517.135/0001-95,2026-03,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:56
@@ -705,7 +705,7 @@ A PARTIR DE AGORA, EMITIR NF DE TODAS AS VENDAS",,,100.0,0,,2026-05-11 11:28:43
 4533,57,TATIANE,59.315.033/0001-73,2026-03,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:57
 4716,57,TATIANE,59.315.033/0001-73,2026-03,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-07 13:12:12
 30621,60,THALES (FERRO VELHO),28.847.818/0001-63,2026-03,OUTRA,21 - Outra Demanda,21 - Outra Demanda,concluida,,,,,,,100.0,0,,2026-05-07 14:44:13
-4600,72,THIAGO,53.132.944/0001-89,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:40:01
+4600,72,THIAGO,53.132.944/0001-89,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:40:01
 4601,72,THIAGO,53.132.944/0001-89,2026-03,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-07 15:24:07
 4604,72,THIAGO,53.132.944/0001-89,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-07 15:24:06
 24662,72,THIAGO,53.132.944/0001-89,2026-03,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-05-07 15:24:09
@@ -714,7 +714,7 @@ A PARTIR DE AGORA, EMITIR NF DE TODAS AS VENDAS",,,100.0,0,,2026-05-11 11:28:43
 4436,51,VANDA (RALLY),32.505.910/0001-12,2026-03,GUIA_MEI,09 - Gerar/Enviar DAS-MEI,09 - Gerar/Enviar DAS-MEI,concluida,,,,,,,100.0,0,,2026-05-04 13:39:55
 4437,51,VANDA (RALLY),32.505.910/0001-12,2026-03,REL_MEI,11 - Relatório Mensal do MEI,11 - Relatório Mensal do MEI,concluida,,,,,,,100.0,0,,2026-05-07 13:06:26
 4438,51,VANDA (RALLY),32.505.910/0001-12,2026-03,PEDIR_INFOS,06 - Pedir Informações ao Cliente,06 - Pedir Informações ao Cliente,concluida,,,,,,,100.0,0,,2026-05-04 13:39:55
-4463,71,WESLEY (FISIO),55.605.484/0001-94,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:56
+4463,71,WESLEY (FISIO),55.605.484/0001-94,2026-03,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,EDIVAN,EDIVAN,,[Responsável: Edivan],,,100.0,0,,2026-05-04 13:39:56
 4464,71,WESLEY (FISIO),55.605.484/0001-94,2026-03,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-05-04 13:39:56
 4465,71,WESLEY (FISIO),55.605.484/0001-94,2026-03,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-05-04 13:39:56
 4468,71,WESLEY (FISIO),55.605.484/0001-94,2026-03,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-05-04 13:39:56
@@ -774,12 +774,12 @@ A PARTIR DE AGORA, EMITIR NF DE TODAS AS VENDAS",,,100.0,0,,2026-05-11 11:28:43
 671,48,CARLOS ALBERTO,11.858.043/0001-29,2026-02,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-04-16 16:58:54
 14324,48,CARLOS ALBERTO,11.858.043/0001-29,2026-02,COBRAR_HONORARIOS,17 - Cobrar Honorários,17 - Cobrar Honorários,concluida,,,,,,,100.0,0,,2026-04-16 16:59:05
 24645,48,CARLOS ALBERTO,11.858.043/0001-29,2026-02,PUXAR_NF_SAIDA,15 - Puxar NF de Saída (SEFAZ),15 - Puxar NF de Saída (SEFAZ),concluida,,,,,,,100.0,0,,2026-04-16 16:59:09
-1047,80,CAROL,45.533.719/0001-26,2026-02,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,,,,[Responsável: Jéssica],,,100.0,0,,2026-03-10 15:14:28
+1047,80,CAROL,45.533.719/0001-26,2026-02,APUR_SIMPLES,08 - Apuração do Simples Nacional,08 - Apuração do Simples Nacional,concluida,JÉSSICA,JÉSSICA,,[Responsável: Jéssica],,,100.0,0,,2026-03-10 15:14:28
 1048,80,CAROL,45.533.719/0001-26,2026-02,EXEC_FOLHA,01 - Execução da Folha de Pagamento,01 - Execução da Folha de Pagamento,concluida,,,,,,,100.0,0,,2026-03-20 15:14:55
 1049,80,CAROL,45.533.719/0001-26,2026-02,PARC_IMPOSTOS,19 - Parcelamento de Impostos (outro),19 - Parcelamento de Impostos (outro),concluida,,,,,,,100.0,0,,2026-04-16 16:59:13
 1050,80,CAROL,45.533.719/0001-26,2026-02,REL_DEBITOS,13 - Relatório de Débitos,13 - Relatório de Débitos,concluida,,,,,,,100.0,0,,2026-03-16 14:36:54
 1051,80,CAROL,45.533.719/0001-26,2026-02,CONS_ICMS_ST,14 - Consulta ICMS-ST (SEFAZ),14 - Consulta ICMS-ST (SEFAZ),concluida,,,,,,,100.0,0,,2026-04-16 16:59:14
-1052,80,CAROL,45.533.719/0001-26,2026-02,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,,,,[Responsável: Jéssica],,,100.0,0,,2026-03-11 15:42:29
+1052,80,CAROL,45.533.719/0001-26,2026-02,ENV_PARC_SIMPLES,10 - Enviar Parcelamento do Simples/MEI,10 - Enviar Parcelamento do Simples/MEI,concluida,JÉSSICA,JÉSSICA,,[Responsável: Jéssica],,,100.0,0,,2026-03-11 15:42:29
 1053,80,CAROL,45.533.719/0001-26,2026-02,GUIA_PREF,12 - Guia da Prefeitura,12 - Guia da Prefeitura,concluida,,,,,,,100.0,0,,2026-04-02 22:10:04
 1054,80,CAROL,45.533.719/0001-26,2026-02,ENV_CONTRACHEQUES,02 - Envio de Contracheques,02 - Envio de Contracheques,concluida,,,,,,,100.0,0,,2026-03-20 15:14:55
 1055,80,CAROL,45.533.719/0001-26,2026-02,GUIA_INSS,03 - Geração/Envio Guia INSS,03 - Geração/Envio Guia INSS,concluida,,,,,,,100.0,0,,2026-03-20 15:14:55

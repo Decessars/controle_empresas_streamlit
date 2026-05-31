@@ -27,6 +27,11 @@ PASSWORD_HASHES = {
         "nome": "DMLIMA",
         "perfil": "admin",
         "sha256": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    },
+    "EDIVAN": {
+        "nome": "EDIVAN",
+        "perfil": "estagiario",
+        "sha256": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
     }
 }
 
@@ -157,7 +162,24 @@ def sha256_text(value: str) -> str:
 
 
 def normalize_user(value: str) -> str:
-    return str(value or "").strip().upper()
+    text = str(value or "").strip()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return text.upper()
+
+
+def extract_responsavel_from_observacao(value: str) -> str:
+    text = str(value or "")
+    marker = "[Responsável:"
+    if marker not in text:
+        marker = "[Responsavel:"
+    if marker not in text:
+        return ""
+    start = text.find(marker) + len(marker)
+    end = text.find("]", start)
+    if end == -1:
+        return ""
+    return normalize_user(text[start:end])
 
 
 def check_login(username: str, password: str) -> bool:
@@ -220,6 +242,10 @@ def normalize_demandas(demandas: pd.DataFrame, empresas: pd.DataFrame) -> pd.Dat
     df["empresa"] = df["empresa"].fillna("").astype(str)
     df["cnpj"] = df["cnpj"].fillna("").astype(str)
     df["status"] = df["status"].fillna("pendente").astype(str).replace("", "pendente")
+    parsed_resp = df["observacao"].fillna("").astype(str).map(extract_responsavel_from_observacao)
+    for col in ["responsavel_operacional", "estagiario_responsavel"]:
+        df[col] = df[col].fillna("").astype(str)
+        df[col] = df[col].where(df[col].str.strip().ne(""), parsed_resp)
     return df
 
 
@@ -430,11 +456,11 @@ def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_pa
         q = busca.strip().upper()
         blob = (df["empresa"] + " " + df["cnpj"] + " " + df["tipo_demanda"] + " " + df["observacao"]).str.upper()
         df = df[blob.str.contains(q, regex=False)].copy()
-    if minhas and not is_admin():
+    if minhas:
         user = current_user()
         df = df[
-            df["responsavel_operacional"].astype(str).str.upper().eq(user)
-            | df["estagiario_responsavel"].astype(str).str.upper().eq(user)
+            df["responsavel_operacional"].astype(str).map(normalize_user).eq(user)
+            | df["estagiario_responsavel"].astype(str).map(normalize_user).eq(user)
         ].copy()
 
     total = len(df)
