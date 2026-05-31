@@ -39,7 +39,7 @@ AUTH_SESSION_TTL_SECONDS = 3600
 AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
-SCHEMA_VERSION = "2026-05-30-03"
+SCHEMA_VERSION = "2026-05-30-04"
 _ENGINE = None
 _ENGINE_URL = None
 
@@ -2149,7 +2149,14 @@ def init_db() -> None:
     ensure_column("empresas", "prolabore", "INTEGER", "0")
     ensure_column("empresas", "prefeitura_optante", "INTEGER", "0")
     ensure_column("empresas", "fgts_parc", "INTEGER", "0")
+    ensure_column("empresas", "link_rapido", "TEXT")
+    ensure_column("empresas", "senhas_acessos", "TEXT")
+    ensure_column("empresas", "observacoes", "TEXT")
     ensure_column("demandas", "observacao", "TEXT", "''")
+    ensure_column("historico_regime", "cnpj", "TEXT")
+    ensure_column("historico_regime", "data_inicio", "TEXT")
+    ensure_column("historico_regime", "criado_em", "TEXT")
+    ensure_column("historico_regime", "usuario", "TEXT")
     ensure_column("historico_regime", "regime_anterior", "TEXT")
     ensure_column("historico_regime", "origem", "TEXT")
     ensure_user_schema()
@@ -2165,6 +2172,8 @@ def ensure_database_indexes() -> None:
     index_statements = [
         "CREATE INDEX IF NOT EXISTS idx_empresas_cnpj ON empresas (cnpj)",
         "CREATE INDEX IF NOT EXISTS idx_empresas_razao_social ON empresas (razao_social)",
+        "CREATE INDEX IF NOT EXISTS idx_empresas_regime ON empresas (regime)",
+        "CREATE INDEX IF NOT EXISTS idx_empresas_is_ativo ON empresas (is_ativo)",
         "CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_competencia ON demandas (competencia)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_id ON demandas (empresa_id)",
@@ -2619,6 +2628,7 @@ def load_empresas(active_only: bool = True) -> pd.DataFrame:
                COALESCE(apelido,'') AS apelido, COALESCE(regime,'') AS regime,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
+               COALESCE(funcionarios,0) AS funcionarios,
                {active_expr} AS is_ativo, atualizado_em
         FROM empresas
         {where}
@@ -2672,37 +2682,64 @@ def format_brl_currency(val: str) -> str:
 
 def save_empresa(data: dict, empresa_id: int | None = None) -> None:
     timestamp = now_str()
-    is_ativo = 0 if int(data.get("inativo", 0)) else 1
-    simples_optante = int(data.get("simples_optante", 0) or 0)
-    mei_optante = int(data.get("mei_optante", 0) or 0)
+    before_existing = empresa_row(int(empresa_id)) if empresa_id else {}
+
+    def txt_field(key: str, default: str = "") -> str:
+        if key not in data:
+            return str(before_existing.get(key, default) or "")
+        value = str(data.get(key, "") or "").strip()
+        if not value and before_existing.get(key):
+            return str(before_existing.get(key, "") or "")
+        return value
+
+    def int_field(key: str, default: int = 0) -> int:
+        if key not in data:
+            return int(before_existing.get(key, default) or 0)
+        return int(data.get(key, default) or 0)
+
+    inativo = int_field("inativo", 0)
+    is_ativo = 0 if inativo else 1
+    simples_optante = int_field("simples_optante", 0)
+    mei_optante = int_field("mei_optante", 0)
     normalized = {
-        "cnpj": normalize_cnpj(data["cnpj"]),
-        "razao_social": data["razao_social"].strip(),
-        "nome_fantasia": data.get("nome_fantasia", "").strip(),
-        "apelido": data.get("apelido", "").strip(),
-        "regime": data.get("regime", "").strip(),
-        "abertura": data.get("abertura", "").strip(),
-        "situacao": data.get("situacao", "").strip(),
-        "porte": data.get("porte", "").strip(),
-        "natureza_juridica": data.get("natureza_juridica", "").strip(),
-        "capital_social": data.get("capital_social", "").strip(),
+        "cnpj": normalize_cnpj(txt_field("cnpj")),
+        "razao_social": txt_field("razao_social"),
+        "nome_fantasia": txt_field("nome_fantasia"),
+        "apelido": txt_field("apelido"),
+        "regime": txt_field("regime"),
+        "abertura": txt_field("abertura"),
+        "situacao": txt_field("situacao"),
+        "porte": txt_field("porte"),
+        "natureza_juridica": txt_field("natureza_juridica"),
+        "capital_social": txt_field("capital_social"),
         "simples_optante": simples_optante,
         "mei_optante": mei_optante,
-        "mensalidade": format_brl_currency(data.get("mensalidade", "")),
-        "cidade": data.get("cidade", "").strip(),
-        "uf": data.get("uf", "").strip().upper(),
-        "inativo": int(data.get("inativo", 0)),
+        "mensalidade": format_brl_currency(txt_field("mensalidade")),
+        "cidade": txt_field("cidade"),
+        "uf": txt_field("uf").upper(),
+        "funcionarios": int_field("funcionarios", 0),
+        "link_rapido": txt_field("link_rapido"),
+        "senhas_acessos": txt_field("senhas_acessos"),
+        "observacoes": txt_field("observacoes"),
+        "inativo": inativo,
         "is_ativo": is_ativo,
         "timestamp": timestamp,
     }
+    if not normalized["cnpj"] or not normalized["razao_social"]:
+        raise ValueError("CNPJ e razao social sao obrigatorios.")
     if empresa_id:
-        before = empresa_snapshot(empresa_row(int(empresa_id)))
+        before = empresa_snapshot(before_existing)
+        regime_before = str(before.get("regime", "") or "").strip()
+        regime_after = str(normalized["regime"] or "").strip()
+        if regime_before and regime_after and regime_before != regime_after and not str(data.get("regime_vigencia", "") or "").strip():
+            raise ValueError("Informe a data de vigencia para alterar o regime.")
         execute(
             """
             UPDATE empresas
                SET cnpj=?, razao_social=?, nome_fantasia=?, apelido=?, regime=?,
                    abertura=?, situacao=?, porte=?, natureza_juridica=?, capital_social=?,
                    simples_optante=?, mei_optante=?, mensalidade=?, cidade=?, uf=?,
+                   funcionarios=?, link_rapido=?, senhas_acessos=?, observacoes=?,
                    inativo=?, is_ativo=?, atualizado_em=?
              WHERE id=?
             """,
@@ -2722,6 +2759,10 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["mensalidade"],
                 normalized["cidade"],
                 normalized["uf"],
+                normalized["funcionarios"],
+                normalized["link_rapido"],
+                normalized["senhas_acessos"],
+                normalized["observacoes"],
                 normalized["inativo"],
                 normalized["is_ativo"],
                 timestamp,
@@ -2744,14 +2785,23 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
             else:
                 action = "ALTERACAO"
             record_empresa_history(int(empresa_id), action, before, after)
+        if regime_before and regime_after and regime_before != regime_after:
+            record_historico_regime(
+                int(empresa_id),
+                normalized["cnpj"],
+                regime_before,
+                regime_after,
+                str(data.get("regime_vigencia", "") or "").strip(),
+            )
     else:
         execute(
             """
             INSERT INTO empresas
                 (cnpj, razao_social, nome_fantasia, apelido, regime, abertura, situacao,
                  porte, natureza_juridica, capital_social, simples_optante, mei_optante,
-                 mensalidade, cidade, uf, inativo, is_ativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 mensalidade, cidade, uf, funcionarios, link_rapido, senhas_acessos, observacoes,
+                 inativo, is_ativo, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 normalized["cnpj"],
@@ -2769,6 +2819,10 @@ def save_empresa(data: dict, empresa_id: int | None = None) -> None:
                 normalized["mensalidade"],
                 normalized["cidade"],
                 normalized["uf"],
+                normalized["funcionarios"],
+                normalized["link_rapido"],
+                normalized["senhas_acessos"],
+                normalized["observacoes"],
                 normalized["inativo"],
                 normalized["is_ativo"],
                 timestamp,
@@ -2792,6 +2846,10 @@ def empresa_row_by_cnpj(cnpj: str) -> dict:
                COALESCE(mei_optante,0) AS mei_optante,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
+               COALESCE(funcionarios,0) AS funcionarios,
+               COALESCE(link_rapido,'') AS link_rapido,
+               COALESCE(senhas_acessos,'') AS senhas_acessos,
+               COALESCE(observacoes,'') AS observacoes,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
                atualizado_em, criado_em
           FROM empresas
@@ -2820,6 +2878,10 @@ def empresa_row(empresa_id: int) -> dict:
                COALESCE(mei_optante,0) AS mei_optante,
                COALESCE(mensalidade,'') AS mensalidade, COALESCE(cidade,'') AS cidade,
                COALESCE(uf,'') AS uf, COALESCE(inativo,0) AS inativo,
+               COALESCE(funcionarios,0) AS funcionarios,
+               COALESCE(link_rapido,'') AS link_rapido,
+               COALESCE(senhas_acessos,'') AS senhas_acessos,
+               COALESCE(observacoes,'') AS observacoes,
                COALESCE(is_ativo, CASE WHEN COALESCE(inativo,0)=1 THEN 0 ELSE 1 END) AS is_ativo,
                atualizado_em, criado_em
           FROM empresas
@@ -2852,6 +2914,10 @@ def empresa_snapshot(row: dict | None) -> dict:
         "mensalidade": str(data.get("mensalidade", "") or ""),
         "cidade": str(data.get("cidade", "") or ""),
         "uf": str(data.get("uf", "") or ""),
+        "funcionarios": int(data.get("funcionarios", 0) or 0),
+        "link_rapido": str(data.get("link_rapido", "") or ""),
+        "senhas_acessos": str(data.get("senhas_acessos", "") or ""),
+        "observacoes": str(data.get("observacoes", "") or ""),
         "inativo": int(data.get("inativo", 0) or 0),
         "is_ativo": int(data.get("is_ativo", 1) or 1),
         "atualizado_em": str(data.get("atualizado_em", "") or ""),
@@ -2894,6 +2960,75 @@ def record_empresa_history(empresa_id: int, action: str, before: dict, after: di
             now_str(),
         ),
     )
+
+
+def record_historico_regime(empresa_id: int, cnpj: str, regime_anterior: str, regime_novo: str, data_inicio: str) -> None:
+    usuario = str(st.session_state.get("auth_user", "") or st.session_state.get("user_name", "") or "sistema").strip()
+    criado_em = now_str()
+    execute(
+        """
+        INSERT INTO historico_regime
+            (empresa_id, cnpj, regime_anterior, regime_novo, vigencia_inicio, data_inicio, registrado_em, criado_em, usuario, origem)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(empresa_id),
+            normalize_cnpj(cnpj),
+            str(regime_anterior or ""),
+            str(regime_novo or ""),
+            str(data_inicio or ""),
+            str(data_inicio or ""),
+            criado_em,
+            criado_em,
+            usuario,
+            "web",
+        ),
+    )
+
+
+def load_historico_regime(empresa_id: int) -> pd.DataFrame:
+    return query_df(
+        """
+        SELECT regime_anterior, regime_novo,
+               COALESCE(data_inicio, vigencia_inicio, '') AS data_inicio,
+               COALESCE(usuario,'') AS usuario,
+               COALESCE(criado_em, registrado_em, '') AS criado_em
+          FROM historico_regime
+         WHERE empresa_id=?
+         ORDER BY COALESCE(criado_em, registrado_em, '') DESC, id DESC
+        """,
+        (int(empresa_id),),
+    )
+
+
+def load_empresa_demandas(empresa_id: int) -> set[str]:
+    df = query_df("SELECT tipo FROM empresa_demandas WHERE empresa_id=?", (int(empresa_id),))
+    return set(df["tipo"].astype(str).tolist()) if not df.empty else set()
+
+
+def save_empresa_demandas(empresa_id: int, tipos: list[str]) -> None:
+    execute("DELETE FROM empresa_demandas WHERE empresa_id=?", (int(empresa_id),))
+    for tipo in sorted(set(tipos)):
+        execute(
+            "INSERT INTO empresa_demandas (empresa_id, tipo) VALUES (?, ?) ON CONFLICT(empresa_id, tipo) DO NOTHING",
+            (int(empresa_id), str(tipo)),
+        )
+
+
+def move_empresa_to_trash(empresa_id: int) -> None:
+    row = empresa_row(int(empresa_id))
+    if not row:
+        raise ValueError("Empresa nao encontrada.")
+    payload = {**row, "inativo": 1}
+    save_empresa(payload, int(empresa_id))
+
+
+def restore_empresa_from_trash(empresa_id: int) -> None:
+    row = empresa_row(int(empresa_id))
+    if not row:
+        raise ValueError("Empresa nao encontrada.")
+    payload = {**row, "inativo": 0}
+    save_empresa(payload, int(empresa_id))
 
 
 def empresas_export_csv(df: pd.DataFrame) -> bytes:
@@ -4072,7 +4207,7 @@ def render_empresa_cadastro_on_panel() -> None:
             if existing:
                 st.warning("CNPJ já cadastrado.")
                 st.session_state["empresa_cadastro_on_existing_id"] = int(existing.get("id", 0) or 0)
-                base_row = {**fetched, **existing}
+                base_row = {**existing, **fetched}
             else:
                 st.session_state["empresa_cadastro_on_existing_id"] = 0
                 base_row = fetched
@@ -4100,6 +4235,11 @@ def render_empresa_cadastro_on_panel() -> None:
                         REGIMES,
                         index=REGIMES.index(_regime_option(base_row.get("regime", REGIMES[0]))) if _regime_option(base_row.get("regime", REGIMES[0])) in REGIMES else 0,
                     )
+                    existing_id_for_regime = int(st.session_state.get("empresa_cadastro_on_existing_id", 0) or 0)
+                    existing_regime = _regime_option(empresa_row(existing_id_for_regime).get("regime", "")) if existing_id_for_regime else ""
+                    regime_vigencia = ""
+                    if existing_regime and regime != existing_regime:
+                        regime_vigencia = c2.date_input("Vigencia do regime").isoformat()
                     abertura = c2.text_input("Abertura", value=str(base_row.get("abertura", "")))
                     natureza_juridica = c1.text_input("Natureza jurídica", value=str(base_row.get("natureza_juridica", "")))
                     situacao = c2.text_input("Situação", value=str(base_row.get("situacao", "")))
@@ -4148,6 +4288,7 @@ def render_empresa_cadastro_on_panel() -> None:
                             "mei_optante": 1 if mei_optante else 0,
                             "mensalidade": mensalidade,
                             "inativo": 1 if inativo else 0,
+                            "regime_vigencia": regime_vigencia,
                         }
                         existing_id = int(st.session_state.get("empresa_cadastro_on_existing_id", 0) or 0)
                         if not existing_id:
@@ -4163,6 +4304,270 @@ def render_empresa_cadastro_on_panel() -> None:
                         st.rerun()
 
 
+def _selected_empresa_options(df: pd.DataFrame) -> list[int]:
+    if df.empty or "id" not in df.columns:
+        return []
+    return [int(x) for x in df["id"].dropna().astype(int).tolist()]
+
+
+def _empresa_option_label(empresa_id: int) -> str:
+    row = empresa_row(int(empresa_id))
+    if not row:
+        return str(empresa_id)
+    return f"{row.get('id')} - {row.get('apelido') or row.get('razao_social')} ({row.get('cnpj')})"
+
+
+def _empresa_payload_from_form(
+    *,
+    cnpj: str,
+    razao_social: str,
+    nome_fantasia: str,
+    apelido: str,
+    regime: str,
+    mensalidade: str,
+    cidade: str,
+    uf: str,
+    funcionarios: bool,
+    inativo: bool,
+    abertura: str = "",
+    natureza_juridica: str = "",
+    situacao: str = "",
+    capital_social: str = "",
+    porte: str = "",
+    simples_optante: bool = False,
+    mei_optante: bool = False,
+    link_rapido: str = "",
+    senhas_acessos: str = "",
+    observacoes: str = "",
+    regime_vigencia: str = "",
+) -> dict:
+    return {
+        "cnpj": cnpj,
+        "razao_social": razao_social,
+        "nome_fantasia": nome_fantasia,
+        "apelido": apelido,
+        "regime": regime,
+        "mensalidade": mensalidade,
+        "cidade": cidade,
+        "uf": uf,
+        "funcionarios": 1 if funcionarios else 0,
+        "inativo": 1 if inativo else 0,
+        "abertura": abertura,
+        "natureza_juridica": natureza_juridica,
+        "situacao": situacao,
+        "capital_social": capital_social,
+        "porte": porte,
+        "simples_optante": 1 if simples_optante else 0,
+        "mei_optante": 1 if mei_optante else 0,
+        "link_rapido": link_rapido,
+        "senhas_acessos": senhas_acessos,
+        "observacoes": observacoes,
+        "regime_vigencia": regime_vigencia,
+    }
+
+
+def apply_cadastro_on_to_editor_state(empresa_id: int, prefix: str) -> None:
+    row = empresa_row(int(empresa_id))
+    cnpj = row.get("cnpj", "") if row else ""
+    if not cnpj_valido(cnpj):
+        st.error("Empresa sem CNPJ valido para Cadastro On.")
+        return
+    try:
+        info = fetch_empresa_cadastro_on(cnpj)
+    except Exception as exc:
+        st.error(f"Falha no Cadastro On: {exc}")
+        return
+    for key in [
+        "cnpj",
+        "razao_social",
+        "nome_fantasia",
+        "apelido",
+        "regime",
+        "abertura",
+        "natureza_juridica",
+        "situacao",
+        "capital_social",
+        "cidade",
+        "uf",
+        "porte",
+        "simples_optante",
+        "mei_optante",
+    ]:
+        st.session_state[f"{prefix}_{key}_{empresa_id}"] = info.get(key, "")
+    st.toast("Dados do Cadastro On carregados para revisao.")
+
+
+def render_empresa_quick_editor(empresa_id: int) -> None:
+    row = empresa_row(int(empresa_id))
+    if not row:
+        st.warning("Empresa selecionada nao encontrada.")
+        return
+
+    with st.container(border=True):
+        st.markdown("#### Edicao rapida")
+        with st.form(f"empresa_quick_form_{empresa_id}", clear_on_submit=False):
+            c1, c2, c3 = st.columns(3)
+            cnpj = c1.text_input("CNPJ", value=str(row.get("cnpj", "")), key=f"quick_cnpj_{empresa_id}")
+            razao = c2.text_input("Razao Social", value=str(row.get("razao_social", "")), key=f"quick_razao_social_{empresa_id}")
+            fantasia = c3.text_input("Nome Fantasia", value=str(row.get("nome_fantasia", "")), key=f"quick_nome_fantasia_{empresa_id}")
+            apelido = c1.text_input("Apelido", value=str(row.get("apelido", "")), key=f"quick_apelido_{empresa_id}")
+            regime_before = _regime_option(row.get("regime", REGIMES[0]))
+            regime = c2.selectbox("Regime", REGIMES, index=REGIMES.index(regime_before), key=f"quick_regime_{empresa_id}")
+            mensalidade = c3.text_input("Mensalidade", value=str(row.get("mensalidade", "")), key=f"quick_mensalidade_{empresa_id}")
+            cidade = c1.text_input("Cidade", value=str(row.get("cidade", "")), key=f"quick_cidade_{empresa_id}")
+            uf = c2.text_input("UF", value=str(row.get("uf", "")), max_chars=2, key=f"quick_uf_{empresa_id}")
+            funcionarios = c3.checkbox("Tem funcionarios", value=int(row.get("funcionarios", 0) or 0) == 1, key=f"quick_funcionarios_{empresa_id}")
+            inativo = c1.checkbox("Inativo", value=int(row.get("inativo", 0) or 0) == 1, key=f"quick_inativo_{empresa_id}")
+            regime_vigencia = ""
+            if regime != regime_before:
+                regime_vigencia = c2.date_input("Vigencia do regime").isoformat()
+            b1, b2, b3, b4 = st.columns(4)
+            save_clicked = b1.form_submit_button("Salvar")
+            cadastro_on_clicked = b2.form_submit_button("Cadastro On")
+            full_clicked = b3.form_submit_button("Editar completo")
+            trash_clicked = b4.form_submit_button("Mover para lixeira")
+
+        if cadastro_on_clicked:
+            apply_cadastro_on_to_editor_state(empresa_id, "quick")
+            st.rerun()
+        if full_clicked:
+            st.session_state["empresa_full_edit_id"] = int(empresa_id)
+            st.rerun()
+        if trash_clicked:
+            move_empresa_to_trash(int(empresa_id))
+            st.toast("Empresa movida para a lixeira.")
+            st.session_state["empresa_quick_edit_id"] = 0
+            st.rerun()
+        if save_clicked:
+            payload = _empresa_payload_from_form(
+                cnpj=cnpj,
+                razao_social=razao,
+                nome_fantasia=fantasia,
+                apelido=apelido,
+                regime=regime,
+                mensalidade=mensalidade,
+                cidade=cidade,
+                uf=uf,
+                funcionarios=funcionarios,
+                inativo=inativo,
+                regime_vigencia=regime_vigencia,
+            )
+            save_empresa(payload, int(empresa_id))
+            st.toast("Empresa atualizada.")
+            st.rerun()
+
+
+def render_editor_empresa(emp_id: int) -> None:
+    row = empresa_row(int(emp_id))
+    if not row:
+        st.warning("Empresa selecionada nao encontrada.")
+        return
+
+    with st.container(border=True):
+        st.markdown(f"#### Editor completo - {row.get('razao_social', '')}")
+        regime_before = _regime_option(row.get("regime", REGIMES[0]))
+        with st.form(f"empresa_full_form_{emp_id}", clear_on_submit=False):
+            c1, c2, c3 = st.columns(3)
+            cnpj = c1.text_input("CNPJ", value=str(row.get("cnpj", "")), key=f"full_cnpj_{emp_id}")
+            razao = c2.text_input("Razao Social", value=str(row.get("razao_social", "")), key=f"full_razao_social_{emp_id}")
+            fantasia = c3.text_input("Nome Fantasia", value=str(row.get("nome_fantasia", "")), key=f"full_nome_fantasia_{emp_id}")
+            apelido = c1.text_input("Apelido", value=str(row.get("apelido", "")), key=f"full_apelido_{emp_id}")
+            regime = c2.selectbox("Regime", REGIMES, index=REGIMES.index(regime_before), key=f"full_regime_{emp_id}")
+            mensalidade = c3.text_input("Mensalidade", value=str(row.get("mensalidade", "")), key=f"full_mensalidade_{emp_id}")
+            funcionarios = c1.checkbox("Tem funcionarios", value=int(row.get("funcionarios", 0) or 0) == 1, key=f"full_funcionarios_{emp_id}")
+            abertura = c2.text_input("Abertura", value=str(row.get("abertura", "")), key=f"full_abertura_{emp_id}")
+            natureza = c3.text_input("Natureza Juridica", value=str(row.get("natureza_juridica", "")), key=f"full_natureza_juridica_{emp_id}")
+            situacao = c1.text_input("Situacao", value=str(row.get("situacao", "")), key=f"full_situacao_{emp_id}")
+            capital = c2.text_input("Capital Social", value=str(row.get("capital_social", "")), key=f"full_capital_social_{emp_id}")
+            cidade = c3.text_input("Cidade", value=str(row.get("cidade", "")), key=f"full_cidade_{emp_id}")
+            uf = c1.text_input("UF", value=str(row.get("uf", "")), max_chars=2, key=f"full_uf_{emp_id}")
+            porte = c2.text_input("Porte", value=str(row.get("porte", "")), key=f"full_porte_{emp_id}")
+            simples = c1.checkbox("Simples Optante", value=int(row.get("simples_optante", 0) or 0) == 1, key=f"full_simples_optante_{emp_id}")
+            mei = c2.checkbox("MEI Optante", value=int(row.get("mei_optante", 0) or 0) == 1, key=f"full_mei_optante_{emp_id}")
+            inativo = c3.checkbox("Inativo", value=int(row.get("inativo", 0) or 0) == 1, key=f"full_inativo_{emp_id}")
+            link_rapido = st.text_input("Link rapido", value=str(row.get("link_rapido", "")), key=f"full_link_rapido_{emp_id}")
+            senhas = st.text_area("Senhas/Acessos", value=str(row.get("senhas_acessos", "")), key=f"full_senhas_acessos_{emp_id}")
+            observacoes = st.text_area("Observacoes", value=str(row.get("observacoes", "")), key=f"full_observacoes_{emp_id}")
+            regime_vigencia = ""
+            if regime != regime_before:
+                regime_vigencia = st.date_input("Data de vigencia do novo regime").isoformat()
+            b1, b2, b3, b4, b5 = st.columns(5)
+            save_clicked = b1.form_submit_button("Salvar")
+            cadastro_on_clicked = b2.form_submit_button("Cadastro On")
+            trash_clicked = b3.form_submit_button("Mover lixeira")
+            back_clicked = b4.form_submit_button("Voltar")
+
+        if cadastro_on_clicked:
+            apply_cadastro_on_to_editor_state(emp_id, "full")
+            st.rerun()
+        if back_clicked:
+            st.session_state["empresa_full_edit_id"] = 0
+            st.rerun()
+        if trash_clicked:
+            move_empresa_to_trash(int(emp_id))
+            st.toast("Empresa movida para a lixeira.")
+            st.session_state["empresa_full_edit_id"] = 0
+            st.rerun()
+        if save_clicked:
+            payload = _empresa_payload_from_form(
+                cnpj=cnpj,
+                razao_social=razao,
+                nome_fantasia=fantasia,
+                apelido=apelido,
+                regime=regime,
+                mensalidade=mensalidade,
+                cidade=cidade,
+                uf=uf,
+                funcionarios=funcionarios,
+                inativo=inativo,
+                abertura=abertura,
+                natureza_juridica=natureza,
+                situacao=situacao,
+                capital_social=capital,
+                porte=porte,
+                simples_optante=simples,
+                mei_optante=mei,
+                link_rapido=link_rapido,
+                senhas_acessos=senhas,
+                observacoes=observacoes,
+                regime_vigencia=regime_vigencia,
+            )
+            save_empresa(payload, int(emp_id))
+            st.toast("Empresa salva.")
+
+            checked_tipos = []
+            for tipo_code, label in DEMAND_TYPES:
+                if st.session_state.get(f"demanda_vinc_{emp_id}_{tipo_code}", False):
+                    checked_tipos.append(tipo_code)
+            save_empresa_demandas(int(emp_id), checked_tipos)
+            st.rerun()
+
+        l1, l2, l3 = st.columns(3)
+        l1.link_button("Abrir CNPJ.biz", cnpj_biz_url(row.get("cnpj", "")), use_container_width=True)
+        l2.text_input("Copiar CNPJ", value=str(row.get("cnpj", "")), key=f"copy_cnpj_{emp_id}")
+        l3.caption(f"Atualizado em: {row.get('atualizado_em', '')}")
+
+        st.markdown("##### Demandas vinculadas")
+        selected_tipos = load_empresa_demandas(int(emp_id))
+        cols = st.columns(3)
+        for idx, (tipo_code, label) in enumerate(DEMAND_TYPES):
+            with cols[idx % 3]:
+                st.checkbox(label, value=tipo_code in selected_tipos, key=f"demanda_vinc_{emp_id}_{tipo_code}")
+        if st.button("Salvar demandas vinculadas", key=f"save_demandas_vinc_{emp_id}", type="primary"):
+            checked_tipos = [
+                tipo_code for tipo_code, _ in DEMAND_TYPES
+                if st.session_state.get(f"demanda_vinc_{emp_id}_{tipo_code}", False)
+            ]
+            save_empresa_demandas(int(emp_id), checked_tipos)
+            st.toast("Demandas vinculadas salvas.")
+            st.rerun()
+
+        hist = load_historico_regime(int(emp_id))
+        if not hist.empty:
+            st.markdown("##### Historico de regime")
+            show_table(hist, key=f"hist_regime_{emp_id}", auto_height=True, row_height=28, editable=False, disabled=True)
+
+
 def render_empresas() -> None:
     st.markdown("**Empresas**")
 
@@ -4171,6 +4576,10 @@ def render_empresas() -> None:
 
     if "empresa_selected_id" not in st.session_state:
         st.session_state["empresa_selected_id"] = 0
+    if "empresa_quick_edit_id" not in st.session_state:
+        st.session_state["empresa_quick_edit_id"] = 0
+    if "empresa_full_edit_id" not in st.session_state:
+        st.session_state["empresa_full_edit_id"] = 0
     if "empresas_view_mode" not in st.session_state:
         st.session_state["empresas_view_mode"] = "ativas"
     if "show_import_uploader" not in st.session_state:
@@ -4238,10 +4647,46 @@ def render_empresas() -> None:
             mime="text/csv",
             use_container_width=True,
         )
+        selected_options = _selected_empresa_options(display_df)
+        if selected_options:
+            a1, a2, a3, a4, a5 = st.columns([2.2, 0.8, 1.1, 1.1, 1.0])
+            selected_id = a1.selectbox(
+                "Empresa selecionada",
+                selected_options,
+                index=selected_options.index(int(st.session_state.get("empresa_selected_id") or selected_options[0]))
+                if int(st.session_state.get("empresa_selected_id") or selected_options[0]) in selected_options else 0,
+                format_func=_empresa_option_label,
+                label_visibility="collapsed",
+                key="empresa_selected_select",
+            )
+            st.session_state["empresa_selected_id"] = int(selected_id)
+            if a2.button("Recarregar", key="btn_empresas_recarregar", use_container_width=True):
+                st.rerun()
+            if a3.button("Editar selecionada", key="btn_empresas_editar", type="primary", use_container_width=True):
+                st.session_state["empresa_quick_edit_id"] = int(selected_id)
+                st.rerun()
+            if st.session_state["empresas_view_mode"] == "excluidas":
+                if a4.button("Restaurar", key="btn_empresas_restaurar", use_container_width=True):
+                    restore_empresa_from_trash(int(selected_id))
+                    st.toast("Empresa restaurada.")
+                    st.session_state["empresas_view_mode"] = "ativas"
+                    st.rerun()
+            else:
+                if a4.button("Mover para lixeira", key="btn_empresas_lixeira", use_container_width=True):
+                    move_empresa_to_trash(int(selected_id))
+                    st.toast("Empresa movida para a lixeira.")
+                    st.rerun()
+            if a5.button("Editor completo", key="btn_empresas_editor_completo", use_container_width=True):
+                st.session_state["empresa_full_edit_id"] = int(selected_id)
+                st.rerun()
 
     editable_mode = st.session_state["empresas_view_mode"] != "excluidas"
 
     render_empresa_cadastro_on_panel()
+    if int(st.session_state.get("empresa_quick_edit_id", 0) or 0):
+        render_empresa_quick_editor(int(st.session_state["empresa_quick_edit_id"]))
+    if int(st.session_state.get("empresa_full_edit_id", 0) or 0):
+        render_editor_empresa(int(st.session_state["empresa_full_edit_id"]))
 
     if st.session_state.get("show_import_uploader", False):
         with st.container(border=True):
