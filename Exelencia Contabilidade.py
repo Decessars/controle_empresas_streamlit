@@ -7899,6 +7899,48 @@ def render_painel(competencia: str) -> None:
         st.rerun()
 
 
+def render_continuous_table(df: pd.DataFrame) -> None:
+    if df.empty:
+        st.info("Nenhum registro encontrado.")
+        return
+    table_html = df.fillna("").to_html(index=False, escape=True, classes="continuous-table")
+    st.markdown(
+        f"""
+        <style>
+        .continuous-table {{
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 0.78rem;
+            line-height: 1.25;
+        }}
+        .continuous-table th,
+        .continuous-table td {{
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            padding: 0.38rem 0.44rem;
+            vertical-align: top;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: normal;
+        }}
+        .continuous-table th {{
+            background: rgba(91, 33, 182, 0.10);
+            color: #0f172a;
+            font-weight: 800;
+        }}
+        .continuous-table tbody tr:nth-child(even) {{
+            background: rgba(241, 245, 249, 0.72);
+        }}
+        .continuous-table tbody tr:hover {{
+            background: rgba(124, 58, 237, 0.08);
+        }}
+        </style>
+        {table_html}
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_empresas() -> None:
     if not is_web_simple_mode():
         render_module_locked("Empresas")
@@ -7934,7 +7976,8 @@ def render_empresas() -> None:
         filtered = filtered[filtered["ativo"].astype(int) == 1].copy()
 
     cols = ["empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia", "regime", "cidade", "uf", "contador_responsavel", "ativo"]
-    st.dataframe(filtered[cols], use_container_width=True, hide_index=True)
+    table_df = filtered[cols].sort_values(["apelido", "razao_social"], na_position="last")
+    render_continuous_table(table_df)
     st.caption("Cadastro e edicao completa ficam no Python principal.")
 
 
@@ -8001,7 +8044,7 @@ def render_demandas(competencia: str) -> None:
         "estagiario_responsavel", "status", "data_limite", "bloqueada", "motivo_bloqueio",
         "observacao", "concluida_em", "concluida_por", "atualizado_em",
     ]
-    st.dataframe(demandas[view_cols], use_container_width=True, hide_index=True)
+    render_continuous_table(demandas[view_cols])
 
     selected_id = st.selectbox(
         "Selecionar demanda",
