@@ -5895,9 +5895,9 @@ def render_modulos() -> None:
     st.subheader("Modulos")
     cols = st.columns(2)
     if cols[0].button("Cadastro de Empresas", key="module_open_empresas_simple", use_container_width=True):
-        set_navigation_target("Empresas", "Empresas")
+        navigate_to("Empresas")
     if cols[1].button("Controle de Demandas", key="module_open_demandas_simple", use_container_width=True, type="primary"):
-        set_navigation_target("Demandas", "Demandas")
+        navigate_to("Demandas")
     return
 
     st.markdown(
@@ -7820,13 +7820,9 @@ def render_painel(competencia: str) -> None:
     st.subheader("Home")
     cols = st.columns(2)
     if cols[0].button("Cadastro de Empresas", key="home_open_empresas_simple", use_container_width=True):
-        st.session_state["page"] = "Empresas"
-        st.query_params["page"] = "Empresas"
-        st.rerun()
+        navigate_to("Empresas")
     if cols[1].button("Controle de Demandas", key="home_open_demandas_simple", use_container_width=True, type="primary"):
-        st.session_state["page"] = "Demandas"
-        st.query_params["page"] = "Demandas"
-        st.rerun()
+        navigate_to("Demandas")
     return
     st.caption(f"Fonte de dados: {get_data_source_mode()}")
     empresas = load_empresas_from_source(active_only=False)
