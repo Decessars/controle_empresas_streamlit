@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import text
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -58,10 +59,33 @@ def normalize_value(value):
 def insert_row(app, table: str, row: dict, *, conflict_clause: str = "") -> int:
     data = {key: normalize_value(value) for key, value in row.items()}
     columns = list(data.keys())
+    if not columns:
+        return 0
     placeholders = ", ".join(["?"] * len(columns))
     column_sql = ", ".join(columns)
     sql = f"INSERT INTO {table} ({column_sql}) VALUES ({placeholders}) {conflict_clause}".strip()
     return app.execute(sql, tuple(data[col] for col in columns))
+
+
+def insert_rows_bulk(app, table: str, rows: list[dict], *, conflict_clause: str = "", chunk_size: int = 500) -> int:
+    if not rows:
+        return 0
+    columns = list(rows[0].keys())
+    if not columns:
+        return 0
+    placeholders = ", ".join([f":{col}" for col in columns])
+    column_sql = ", ".join(columns)
+    sql = text(f"INSERT INTO {table} ({column_sql}) VALUES ({placeholders}) {conflict_clause}".strip())
+    inserted = 0
+    with app.get_engine().begin() as conn:
+        for start in range(0, len(rows), chunk_size):
+            chunk = [
+                {key: normalize_value(row.get(key)) for key in columns}
+                for row in rows[start:start + chunk_size]
+            ]
+            result = conn.execute(sql, chunk)
+            inserted += max(result.rowcount or 0, 0)
+    return inserted
 
 
 def migrate_empresas(app, source: Path, available: set[str]) -> tuple[dict[int, int], int, int, int]:
@@ -118,7 +142,8 @@ def migrate_child_table(
         return 0, 0
 
     cols = target_columns(app, table)
-    inserted = errors = 0
+    rows: list[dict] = []
+    errors = 0
     for _, record in df.iterrows():
         row = record.to_dict()
         source_empresa_id = int(row.get("empresa_id") or 0)
@@ -128,11 +153,89 @@ def migrate_child_table(
             continue
         row["empresa_id"] = target_empresa_id
         clean = {key: value for key, value in row.items() if key in cols and key != "id"}
-        try:
-            inserted += insert_row(app, table, clean, conflict_clause=conflict_clause)
-        except Exception as exc:
+        if clean:
+            rows.append(clean)
+    try:
+        inserted = insert_rows_bulk(app, table, rows, conflict_clause=conflict_clause)
+    except Exception as exc:
+        errors += len(rows)
+        inserted = 0
+        print(f"Erro bulk {table}: {exc}")
+    return inserted, errors
+
+
+def migrate_mapped_table(
+    app,
+    source: Path,
+    available: set[str],
+    table: str,
+    empresa_id_map: dict[int, int],
+    conflict_clause: str,
+    *,
+    drop_id: bool = True,
+) -> tuple[int, int]:
+    if table not in available:
+        return 0, 0
+    df = sqlite_dataframe(source, table)
+    if df.empty:
+        return 0, 0
+
+    cols = target_columns(app, table)
+    rows: list[dict] = []
+    errors = 0
+    for _, record in df.iterrows():
+        row = record.to_dict()
+        source_empresa_id = int(row.get("empresa_id") or 0)
+        target_empresa_id = empresa_id_map.get(source_empresa_id)
+        if not target_empresa_id:
             errors += 1
-            print(f"Erro {table} empresa_id={source_empresa_id}: {exc}")
+            continue
+        row["empresa_id"] = target_empresa_id
+        if drop_id:
+            row.pop("id", None)
+        clean = {key: value for key, value in row.items() if key in cols}
+        if clean:
+            rows.append(clean)
+    try:
+        inserted = insert_rows_bulk(app, table, rows, conflict_clause=conflict_clause)
+    except Exception as exc:
+        errors += len(rows)
+        inserted = 0
+        print(f"Erro bulk {table}: {exc}")
+    return inserted, errors
+
+
+def migrate_simple_table(
+    app,
+    source: Path,
+    available: set[str],
+    table: str,
+    conflict_clause: str,
+    *,
+    drop_id: bool = True,
+) -> tuple[int, int]:
+    if table not in available:
+        return 0, 0
+    df = sqlite_dataframe(source, table)
+    if df.empty:
+        return 0, 0
+
+    cols = target_columns(app, table)
+    rows: list[dict] = []
+    errors = 0
+    for _, record in df.iterrows():
+        row = record.to_dict()
+        if drop_id:
+            row.pop("id", None)
+        clean = {key: value for key, value in row.items() if key in cols}
+        if clean:
+            rows.append(clean)
+    try:
+        inserted = insert_rows_bulk(app, table, rows, conflict_clause=conflict_clause)
+    except Exception as exc:
+        errors += len(rows)
+        inserted = 0
+        print(f"Erro bulk {table}: {exc}")
     return inserted, errors
 
 
@@ -177,6 +280,15 @@ def main() -> None:
 
     available = sqlite_tables(source)
     empresa_id_map, empresas_inserted, empresas_ignored, empresa_errors = migrate_empresas(app, source, available)
+    empresa_demandas_inserted, empresa_demandas_errors = migrate_mapped_table(
+        app,
+        source,
+        available,
+        "empresa_demandas",
+        empresa_id_map,
+        "ON CONFLICT(empresa_id, tipo) DO NOTHING",
+        drop_id=False,
+    )
     demandas_inserted, demandas_errors = migrate_child_table(
         app,
         source,
@@ -193,15 +305,53 @@ def main() -> None:
         empresa_id_map,
         "ON CONFLICT(empresa_id, competencia) DO NOTHING",
     )
+    historico_empresas_inserted, historico_empresas_errors = migrate_mapped_table(
+        app,
+        source,
+        available,
+        "historico_empresas",
+        empresa_id_map,
+        "ON CONFLICT DO NOTHING",
+    )
+    historico_regime_inserted, historico_regime_errors = migrate_mapped_table(
+        app,
+        source,
+        available,
+        "historico_regime",
+        empresa_id_map,
+        "ON CONFLICT DO NOTHING",
+    )
     settings_inserted, settings_errors = migrate_settings(app, source, available)
+    users_inserted, users_errors = migrate_simple_table(
+        app,
+        source,
+        available,
+        "users",
+        "ON CONFLICT(username) DO NOTHING",
+    )
+    logs_inserted, logs_errors = migrate_simple_table(
+        app,
+        source,
+        available,
+        "logs_sistema",
+        "ON CONFLICT DO NOTHING",
+    )
 
     print("Migracao concluida.")
     print(f"Empresas inseridas: {empresas_inserted}")
     print(f"Empresas ignoradas por duplicidade: {empresas_ignored}")
+    print(f"Empresa demandas migradas: {empresa_demandas_inserted}")
     print(f"Demandas migradas: {demandas_inserted}")
     print(f"Faturamento MEI migrado: {faturamento_inserted}")
+    print(f"Historico de empresas migrado: {historico_empresas_inserted}")
+    print(f"Historico de regime migrado: {historico_regime_inserted}")
     print(f"Settings migrados: {settings_inserted}")
-    print(f"Erros: {empresa_errors + demandas_errors + faturamento_errors + settings_errors}")
+    print(f"Users migrados: {users_inserted}")
+    print(f"Logs migrados: {logs_inserted}")
+    print(
+        "Erros: "
+        f"{empresa_errors + empresa_demandas_errors + demandas_errors + faturamento_errors + historico_empresas_errors + historico_regime_errors + settings_errors + users_errors + logs_errors}"
+    )
 
 
 if __name__ == "__main__":

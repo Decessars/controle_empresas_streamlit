@@ -1839,6 +1839,15 @@ def init_db() -> None:
         )
         execute(
             """
+            CREATE TABLE IF NOT EXISTS empresa_demandas (
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+                tipo TEXT NOT NULL,
+                PRIMARY KEY (empresa_id, tipo)
+            )
+            """
+        )
+        execute(
+            """
             CREATE TABLE IF NOT EXISTS faturamento_mei (
                 id SERIAL PRIMARY KEY,
                 empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
@@ -1864,6 +1873,19 @@ def init_db() -> None:
                 snapshot_anterior TEXT,
                 snapshot_atual TEXT,
                 criado_em TEXT
+            )
+            """
+        )
+        execute(
+            """
+            CREATE TABLE IF NOT EXISTS historico_regime (
+                id SERIAL PRIMARY KEY,
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+                regime_anterior TEXT,
+                regime_novo TEXT NOT NULL,
+                vigencia_inicio TEXT NOT NULL,
+                registrado_em TEXT NOT NULL,
+                origem TEXT
             )
             """
         )
@@ -1954,6 +1976,16 @@ def init_db() -> None:
             )
             conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS empresa_demandas (
+                empresa_id INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                PRIMARY KEY (empresa_id, tipo),
+                FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
+            )
+            """
+            )
+            conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS faturamento_mei (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 empresa_id INTEGER NOT NULL,
@@ -1981,6 +2013,20 @@ def init_db() -> None:
                 snapshot_atual TEXT,
                 criado_em TEXT,
                 FOREIGN KEY (empresa_id) REFERENCES empresas(id)
+            )
+            """
+            )
+            conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS historico_regime (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                empresa_id INTEGER NOT NULL,
+                regime_anterior TEXT,
+                regime_novo TEXT NOT NULL,
+                vigencia_inicio TEXT NOT NULL,
+                registrado_em TEXT NOT NULL,
+                origem TEXT,
+                FOREIGN KEY (empresa_id) REFERENCES empresas(id) ON DELETE CASCADE
             )
             """
             )
@@ -2044,6 +2090,8 @@ def init_db() -> None:
     ensure_column("empresas", "prefeitura_optante", "INTEGER", "0")
     ensure_column("empresas", "fgts_parc", "INTEGER", "0")
     ensure_column("demandas", "observacao", "TEXT", "''")
+    ensure_column("historico_regime", "regime_anterior", "TEXT")
+    ensure_column("historico_regime", "origem", "TEXT")
     ensure_user_schema()
     ensure_column("logs_sistema", "usuario", "TEXT")
     ensure_column("logs_sistema", "acao", "TEXT")
@@ -2061,8 +2109,11 @@ def ensure_database_indexes() -> None:
         "CREATE INDEX IF NOT EXISTS idx_demandas_competencia ON demandas (competencia)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_empresa_id ON demandas (empresa_id)",
         "CREATE INDEX IF NOT EXISTS idx_demandas_tipo ON demandas (tipo)",
+        "CREATE INDEX IF NOT EXISTS idx_empresa_demandas_empresa_id ON empresa_demandas (empresa_id)",
+        "CREATE INDEX IF NOT EXISTS idx_empresa_demandas_tipo ON empresa_demandas (tipo)",
         "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_empresa_id ON faturamento_mei (empresa_id)",
         "CREATE INDEX IF NOT EXISTS idx_faturamento_mei_competencia ON faturamento_mei (competencia)",
+        "CREATE INDEX IF NOT EXISTS idx_historico_regime_empresa_id ON historico_regime (empresa_id)",
         "CREATE INDEX IF NOT EXISTS idx_auth_sessions_username ON auth_sessions (username)",
         "CREATE INDEX IF NOT EXISTS idx_active_sessions_usuario ON active_sessions (usuario)",
     ]
@@ -4498,7 +4549,17 @@ def render_backup() -> None:
     if using_postgres():
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for table in ["empresas", "demandas", "historico_empresas", "faturamento_mei", "settings"]:
+            for table in [
+                "empresas",
+                "empresa_demandas",
+                "demandas",
+                "historico_empresas",
+                "historico_regime",
+                "faturamento_mei",
+                "settings",
+                "users",
+                "logs_sistema",
+            ]:
                 df = query_df(f"SELECT * FROM {table}")
                 zf.writestr(f"{table}.csv", df.to_csv(index=False).encode("utf-8-sig"))
         st.download_button(
