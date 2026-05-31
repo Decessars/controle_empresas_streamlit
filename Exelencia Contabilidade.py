@@ -39,6 +39,7 @@ AUTH_SESSION_TTL_SECONDS = 3600
 AUTH_COOKIE_NAME = "ce_auth_token"
 AUTH_SESSION_DEFAULT_PAGE = "Modulos"
 AUTH_SESSION_DEFAULT_LABEL = "📂 Módulos"
+SCHEMA_VERSION = "2026-05-30-03"
 _ENGINE = None
 _ENGINE_URL = None
 
@@ -195,6 +196,15 @@ def apply_nexus_theme() -> None:
                 linear-gradient(180deg, #f8fbff 0%, #f4f7fb 38%, #eef3f9 100%);
             background-size: auto;
             color: var(--nexus-text);
+            opacity: 1 !important;
+            filter: none !important;
+        }
+        .stApp[aria-busy="true"],
+        .stApp[aria-busy="true"] *,
+        div[data-testid="stAppViewContainer"],
+        div[data-testid="stAppViewContainer"] * {
+            opacity: 1 !important;
+            filter: none !important;
         }
         header[data-testid="stHeader"] {
             background-color: transparent !important;
@@ -1605,6 +1615,15 @@ def set_setting(key: str, value: str) -> None:
     )
 
 
+def schema_is_current() -> bool:
+    if not using_postgres():
+        return False
+    try:
+        return get_setting("schema_version") == SCHEMA_VERSION
+    except Exception:
+        return False
+
+
 def active_session_cutoff(minutes: int = 10) -> str:
     return (datetime.now() - timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1732,7 +1751,8 @@ def test_database_connection() -> bool:
         return result.scalar() == 1
 
 
-def database_status_for_login() -> tuple[str, str]:
+@st.cache_data(ttl=30, show_spinner=False)
+def database_status_for_login(database_marker: str) -> tuple[str, str]:
     try:
         total_users = query_df("SELECT COUNT(*) AS total FROM users")
         users_count = int(total_users.iloc[0]["total"] or 0) if not total_users.empty else 0
@@ -2135,6 +2155,20 @@ def ensure_database_indexes() -> None:
     ]
     for statement in index_statements:
         execute(statement)
+
+
+@st.cache_resource(show_spinner=False)
+def ensure_database_initialized(database_marker: str) -> bool:
+    if schema_is_current():
+        return True
+    init_db()
+    if using_postgres():
+        set_setting("schema_version", SCHEMA_VERSION)
+    return True
+
+
+def ensure_database_ready() -> None:
+    ensure_database_initialized(get_database_url() or str(DB_PATH))
 
 
 def demand_options() -> list[str]:
@@ -3151,7 +3185,7 @@ def render_sidebar() -> tuple[str, str]:
 
 
 def require_login_secure() -> bool:
-    init_db()
+    ensure_database_ready()
     ensure_auth_sessions_table()
     if _restore_persistent_auth_session():
         return True
@@ -3207,7 +3241,7 @@ def require_login_secure() -> bool:
             """,
             unsafe_allow_html=True,
         )
-        db_status_kind, db_status_text = database_status_for_login()
+        db_status_kind, db_status_text = database_status_for_login(get_database_url() or str(DB_PATH))
         if db_status_kind == "success":
             st.success(db_status_text, icon="✅")
         elif db_status_kind == "warning":
@@ -4614,7 +4648,7 @@ def render_backup() -> None:
 def main() -> None:
     st.set_page_config(page_title="Controle de Empresas", layout="wide", initial_sidebar_state="expanded")
     apply_nexus_theme()
-    init_db()
+    ensure_database_ready()
 
     if not require_login_secure():
         return
