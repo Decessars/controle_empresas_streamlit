@@ -7775,7 +7775,7 @@ def render_sidebar_secure() -> tuple[str, str]:
     requested_label = next((label for label, page in menu_map.items() if page == requested_page), "Home")
     menu_items = list(menu_map.keys())
     menu_index = menu_items.index(requested_label) if requested_label in menu_items else 0
-    if override_page and "menu_secure" in st.session_state:
+    if st.session_state.get("menu_secure") != requested_label and "menu_secure" in st.session_state:
         del st.session_state["menu_secure"]
 
     with st.sidebar:
