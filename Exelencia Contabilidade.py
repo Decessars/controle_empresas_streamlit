@@ -447,79 +447,98 @@ def apply_nexus_theme() -> None:
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
             color: var(--nexus-text);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 900;
             text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
         .login-mark {
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
             display: inline-grid;
             place-items: center;
-            border-radius: 8px;
-            background: #5b21b6;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 48%, #4f46e5 100%);
             color: #fff;
-            box-shadow: 0 12px 24px rgba(86,0,178,.28);
+            box-shadow: 0 14px 28px rgba(91,33,182,.28);
         }
         .login-title {
-            font-size: 30px;
-            line-height: 1.1;
+            font-size: 28px;
+            line-height: 1.06;
             font-weight: 900;
             color: var(--nexus-text);
-            margin: 0 0 8px 0;
+            margin: 0 0 6px 0;
+            letter-spacing: -0.03em;
         }
         .login-subtitle {
             color: var(--nexus-muted);
-            font-size: 14px;
-            margin-bottom: 22px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            max-width: 34ch;
         }
         .st-key-login_card {
-            width: min(460px, calc(100vw - 48px));
-            margin: 7vh auto 0 auto;
-            background: #ffffff;
-            border: 2px solid rgba(91,33,182,.32);
-            outline: 1px solid rgba(91,33,182,.08);
-            border-radius: 14px;
-            padding: 24px 24px 20px;
-            box-shadow: 0 18px 44px rgba(15,23,42,.10);
+            width: min(392px, calc(100vw - 32px));
+            margin: 8vh auto 0 auto;
+            background:
+                linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(248,250,255,.98) 100%);
+            border: 1px solid rgba(91,33,182,.18);
+            outline: 1px solid rgba(91,33,182,.06);
+            border-radius: 22px;
+            padding: 20px 20px 18px;
+            box-shadow:
+                0 24px 60px rgba(15,23,42,.12),
+                0 2px 0 rgba(255,255,255,.75) inset;
         }
         .st-key-login_card div[data-testid="stForm"] {
             border: 0;
             padding: 0;
         }
         .st-key-login_card input {
-            min-height: 42px;
+            min-height: 40px;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"] {
-            margin-bottom: 0.45rem;
+            margin-bottom: 0.35rem;
             background: #ffffff !important;
-            border: 1px solid rgba(91,33,182,.24) !important;
-            border-radius: 10px !important;
+            border: 1px solid rgba(91,33,182,.18) !important;
+            border-radius: 12px !important;
             box-shadow: 0 1px 0 rgba(15,23,42,.03) inset;
-            padding: 0.15rem 0.4rem !important;
+            padding: 0.08rem 0.3rem !important;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"]:focus-within {
-            border-color: rgba(91,33,182,.52) !important;
-            box-shadow: 0 0 0 3px rgba(91,33,182,.10) !important;
+            border-color: rgba(91,33,182,.58) !important;
+            box-shadow: 0 0 0 3px rgba(91,33,182,.12) !important;
         }
         .st-key-login_card div[data-testid="stTextInputRootElement"] input {
             background: transparent !important;
             border: 0 !important;
             box-shadow: none !important;
-            padding: 0.35rem 0.35rem !important;
-            min-height: 34px !important;
+            padding: 0.28rem 0.35rem !important;
+            min-height: 30px !important;
         }
         .st-key-login_card label {
-            margin-bottom: 0.2rem !important;
+            margin-bottom: 0.14rem !important;
             font-weight: 700 !important;
             color: var(--nexus-text) !important;
+            font-size: 13px !important;
         }
         .st-key-login_card .stButton > button,
         .st-key-login_card div[data-testid="stFormSubmitButton"] button {
             width: 100%;
             min-height: 42px;
+            border-radius: 12px;
+            border: 0;
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 55%, #4f46e5 100%);
+            color: #fff;
+            box-shadow: 0 16px 28px rgba(91,33,182,.22);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+        }
+        .st-key-login_card .stButton > button:hover,
+        .st-key-login_card div[data-testid="stFormSubmitButton"] button:hover {
+            filter: brightness(1.03);
+            transform: translateY(-1px);
         }
         .nexus-brand {
             font-size: 14px;
@@ -1600,7 +1619,6 @@ def remove_active_session() -> None:
 
 
 def load_active_sessions() -> pd.DataFrame:
-    cleanup_active_sessions()
     return query_df(
         """
         SELECT session_id, usuario, COALESCE(page,'') AS page, last_seen, criado_em
@@ -2923,15 +2941,21 @@ def render_sidebar() -> tuple[str, str]:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_items:
         requested_label = "📂 Módulos"
+    menu_index = menu_items.index(requested_label)
     with st.sidebar:
         render_company_logo()
-        page_label = st.radio("Menu", menu_items, index=menu_items.index(requested_label))
+        page_label = st.radio("Menu", menu_items, index=menu_index)
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
         st.session_state["page"] = page
         if st.query_params.get("page") != page:
             st.query_params["page"] = page
-        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        saved_competencia = (
+            st.session_state.get("competencia")
+            or st.session_state.get("ultima_competencia")
+            or get_setting("ultima_competencia", current_competencia())
+        )
+        st.session_state["ultima_competencia"] = saved_competencia
         current_year, current_month = parse_competencia(saved_competencia)
         years = list(range(current_year - 5, current_year + 6))
         month_options = [f"{m:02d}" for m in range(1, 13)]
@@ -2940,7 +2964,9 @@ def render_sidebar() -> tuple[str, str]:
         month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"))
         competencia = f"{int(year)}-{month}"
         st.session_state["competencia"] = competencia
-        set_setting("ultima_competencia", competencia)
+        if st.session_state.get("ultima_competencia") != competencia:
+            st.session_state["ultima_competencia"] = competencia
+            set_setting("ultima_competencia", competencia)
         touch_active_session(page)
         active_now = load_active_sessions()
         st.sidebar.caption(f"Usuarios online: {active_now['usuario'].nunique()} | Sessoes: {len(active_now)}")
@@ -3097,21 +3123,28 @@ def render_sidebar_secure() -> tuple[str, str]:
         requested_label = st.session_state.get("page_label", "📂 Módulos")
     if requested_label not in menu_map:
         requested_label = "📂 Módulos"
+    menu_items = list(menu_map.keys())
+    menu_index = menu_items.index(requested_label)
 
     with st.sidebar:
         render_company_logo()
-        active_now = load_active_sessions()
         st.markdown(f"**Usuário:** {current_user_display_name()}")
         st.caption(f"Perfil: {user_role_label(current_user_role())}")
+        active_now = load_active_sessions()
         st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
-        page_label = st.radio("Menu", list(menu_map.keys()), index=list(menu_map.keys()).index(requested_label), key="menu_secure")
+        page_label = st.radio("Menu", menu_items, index=menu_index, key="menu_secure")
         page = menu_map[page_label]
         st.session_state["page_label"] = page_label
         st.session_state["page"] = page
         if st.query_params.get("page") != page:
             st.query_params["page"] = page
 
-        saved_competencia = st.session_state.get("competencia") or get_setting("ultima_competencia", current_competencia())
+        saved_competencia = (
+            st.session_state.get("competencia")
+            or st.session_state.get("ultima_competencia")
+            or get_setting("ultima_competencia", current_competencia())
+        )
+        st.session_state["ultima_competencia"] = saved_competencia
         current_year, current_month = parse_competencia(saved_competencia)
         years = list(range(current_year - 5, current_year + 6))
         month_options = [f"{m:02d}" for m in range(1, 13)]
@@ -3120,7 +3153,9 @@ def render_sidebar_secure() -> tuple[str, str]:
         month = y2.selectbox("Mes", month_options, index=month_options.index(f"{current_month:02d}"), key="mes_secure")
         competencia = f"{int(year)}-{month}"
         st.session_state["competencia"] = competencia
-        set_setting("ultima_competencia", competencia)
+        if st.session_state.get("ultima_competencia") != competencia:
+            st.session_state["ultima_competencia"] = competencia
+            set_setting("ultima_competencia", competencia)
         touch_active_session(page)
         active_now = load_active_sessions()
         st.caption(f"Usuários online: {active_now['usuario'].nunique()} | Sessões: {len(active_now)}")
