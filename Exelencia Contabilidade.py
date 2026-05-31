@@ -117,14 +117,6 @@ REGIMES = ["Simples Nacional", "MEI", "Lucro Presumido", "Lucro Real", "Imune/Is
 
 MODULES = [
     {
-        "title": "Painel / Home",
-        "desc": "Resumo rapido da competencia atual, indicadores e atalho para as demandas.",
-        "tag": "ATIVO",
-        "icon": "H",
-        "enabled": True,
-        "page": "Painel",
-    },
-    {
         "title": "Cadastro de Empresas",
         "desc": "Lista compacta de empresas para consulta e referencia operacional.",
         "tag": "ATIVO",
@@ -139,30 +131,6 @@ MODULES = [
         "icon": "D",
         "enabled": True,
         "page": "Demandas",
-    },
-    {
-        "title": "Automação",
-        "desc": "Funcionalidade futura. Nesta fase o painel web nao replica automacoes.",
-        "tag": "EM BREVE",
-        "icon": "A",
-        "enabled": False,
-        "page": "Automacao",
-    },
-    {
-        "title": "Relatórios",
-        "desc": "Funcionalidade futura. O foco atual e apenas empresas e demandas.",
-        "tag": "EM BREVE",
-        "icon": "R",
-        "enabled": False,
-        "page": "Relatorios",
-    },
-    {
-        "title": "Backup / Integrações",
-        "desc": "Area reservada para sincronias e rotinas futuras.",
-        "tag": "EM BREVE",
-        "icon": "B",
-        "enabled": False,
-        "page": "Backup",
     },
 ]
 
@@ -921,22 +889,31 @@ def apply_nexus_theme() -> None:
             padding: 6px 4px 2px 4px;
         }
         .global-menu-panel .stButton > button {
-            width: auto !important;
-            min-width: 118px !important;
-            max-width: 160px !important;
-            min-height: 42px !important;
-            padding: 0.35rem 0.55rem !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            min-height: 46px !important;
+            padding: 0.55rem 0.75rem !important;
             white-space: nowrap !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
+            display: flex !important;
+            align-items: center !important;
             justify-content: center !important;
             text-align: center !important;
             border-radius: 12px !important;
             box-sizing: border-box !important;
+            cursor: pointer !important;
         }
         .global-menu-panel .stButton > button p {
             width: 100%;
             text-align: center !important;
+            pointer-events: none !important;
+            margin: 0 !important;
+            line-height: 1.1 !important;
+        }
+        .global-menu-panel .stButton > button span {
+            pointer-events: none !important;
         }
         .login-brand {
             display: inline-flex;
@@ -1318,7 +1295,7 @@ def render_topbar() -> None:
     if "global_menu_open" not in st.session_state:
         st.session_state["global_menu_open"] = False
 
-    cols = st.columns([6.2, 1.0, 1.0, 1.2], vertical_alignment="center")
+    cols = st.columns([7.0, 1.0, 1.2], vertical_alignment="center")
     cols[0].markdown(
         """
         <div class="nexus-topbar">
@@ -1327,17 +1304,15 @@ def render_topbar() -> None:
         """,
         unsafe_allow_html=True,
     )
-    if cols[1].button("🏠 Home", key="topbar_home", use_container_width=True):
-        navigate_to("Modulos", "📂 Módulos")
-    if cols[2].button("⬅️ Voltar", key="topbar_back", use_container_width=True):
+    if cols[1].button("?? Voltar", key="topbar_back", use_container_width=True):
         go_back()
-    if cols[3].button("\u2630 Menu", key="global_menu_toggle", use_container_width=True):
+    if cols[2].button("? Menu", key="global_menu_toggle", use_container_width=True):
         st.session_state["global_menu_open"] = not st.session_state.get("global_menu_open", False)
 
     if st.session_state.get("global_menu_open", False):
         st.markdown('<div class="global-menu-panel">', unsafe_allow_html=True)
         with st.container(border=True):
-            st.caption(f"Navegacao global - pagina atual: {st.session_state.get('page_label', '📂 Módulos')}")
+            st.caption(f"Navegacao global - pagina atual: {st.session_state.get('page_label', '?? M?dulos')}")
             items = list(NAV_MENU.items())
             for start in range(0, len(items), 4):
                 row = items[start:start + 4]
