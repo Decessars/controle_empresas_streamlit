@@ -1499,6 +1499,16 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         "estagiario_responsavel",
     ]
     grid_df = df[visible_order + hidden_order].copy()
+    if not grid_df.empty and "Demanda" in grid_df.columns:
+        demanda_ordem = pd.to_numeric(
+            grid_df["Demanda"].astype(str).str.extract(r"^\s*(\d+)")[0],
+            errors="coerce",
+        ).fillna(999999).astype(int)
+        grid_df = (
+            grid_df.assign(_demanda_ordem=demanda_ordem, _demanda_texto=grid_df["Demanda"].astype(str))
+            .sort_values(["_demanda_ordem", "_demanda_texto", "Empresa"], kind="mergesort")
+            .drop(columns=["_demanda_ordem", "_demanda_texto"])
+        )
     if not AGGRID_AVAILABLE:
         st.info("AgGrid indisponível. Usando fallback em tabela editável.")
         fallback = grid_df.copy()
@@ -1520,7 +1530,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         return selected_ids
 
     builder = GridOptionsBuilder.from_dataframe(grid_df)
-    builder.configure_default_column(sortable=True, filter=True, resizable=True, floatingFilter=True, editable=False)
+    builder.configure_default_column(sortable=False, filter=True, resizable=True, floatingFilter=True, editable=False)
     builder.configure_selection("multiple", use_checkbox=True, header_checkbox=True)
     builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
     builder.configure_grid_options(
@@ -1534,7 +1544,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     for column in ["demanda_id", "status", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
         builder.configure_column(column, hide=True)
     builder.configure_column("Empresa", minWidth=180)
-    builder.configure_column("Demanda", minWidth=220)
+    builder.configure_column("Demanda", minWidth=220, sortable=True, sort="asc")
     builder.configure_column("Responsável", minWidth=120)
     if JsCode is not None:
         status_editable = JsCode(
