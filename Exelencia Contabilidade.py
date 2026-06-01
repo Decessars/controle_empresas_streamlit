@@ -1453,8 +1453,7 @@ def _demandas_apply_batch(
 
 
 def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
-    grid_df = df[[
-        "demanda_id",
+    visible_order = [
         "Empresa",
         "Demanda",
         "Responsável",
@@ -1465,12 +1464,16 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         "Concluída em",
         "Concluída por",
         "Bloqueio",
+    ]
+    hidden_order = [
+        "demanda_id",
         "minha_demanda",
         "editavel",
         "bloqueada",
         "responsavel_operacional",
         "estagiario_responsavel",
-    ]].copy()
+    ]
+    grid_df = df[visible_order + hidden_order].copy()
     if not AGGRID_AVAILABLE:
         st.info("AgGrid indisponível. Usando fallback em tabela editável.")
         fallback = grid_df.copy()
