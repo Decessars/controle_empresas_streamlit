@@ -5,6 +5,7 @@ import csv
 import hashlib
 import hmac
 import json
+from html import escape
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -39,66 +40,212 @@ PASSWORD_HASHES = {
 st.set_page_config(page_title="Controle de Empresas", page_icon="logo.png", layout="wide")
 
 
-def inject_css() -> None:
+def inject_professional_ui_css() -> None:
     st.markdown(
         """
         <style>
         :root {
             --bg: #eef3f9;
+            --panel: rgba(255, 255, 255, 0.86);
             --ink: #0f172a;
             --muted: #64748b;
-            --primary: #6d28d9;
-            --primary-strong: #4c1d95;
-            --table-bg: #090817;
-            --table-alt: #111026;
-            --table-line: #1d2140;
-            --table-head: #8b5cf6;
+            --primary: #2f6fed;
+            --primary-strong: #1e40af;
+            --primary-soft: rgba(47, 111, 237, 0.12);
+            --table-bg: #0f172a;
+            --table-alt: #111827;
+            --table-line: #243044;
+            --table-head: #1d4ed8;
+            --card-border: rgba(148, 163, 184, 0.24);
         }
-        .stApp { background: var(--bg); color: var(--ink); }
-        .block-container { padding-top: 1.2rem; max-width: 1500px; }
-        h1, h2, h3 { letter-spacing: 0; }
-        [data-testid="stSidebar"] { background: #f8fafc; border-right: 1px solid #dbe3ee; }
-        div.stButton > button {
+        .stApp {
+            background:
+                radial-gradient(circle at top left, rgba(47, 111, 237, 0.10), transparent 34%),
+                radial-gradient(circle at right top, rgba(15, 23, 42, 0.05), transparent 26%),
+                var(--bg);
+            color: var(--ink);
+        }
+        .block-container {
+            padding-top: 0.85rem;
+            padding-bottom: 1rem;
+            max-width: 1360px;
+        }
+        section.main > div { padding-top: 0; }
+        h1, h2, h3 {
+            letter-spacing: 0;
+            margin-bottom: 0.35rem;
+        }
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.96));
+            border-right: 1px solid rgba(148, 163, 184, 0.22);
+        }
+        [data-testid="stSidebar"] div.stButton > button {
             width: 100%;
-            border-radius: 8px;
-            min-height: 46px;
-            font-weight: 800;
-            border: 1px solid #cbd5e1;
+        }
+        div.stButton > button {
+            width: auto;
+            min-height: 38px;
+            padding: 0.38rem 0.9rem;
+            border-radius: 10px;
+            font-weight: 700;
+            border: 1px solid rgba(148, 163, 184, 0.40);
             background: #ffffff;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+            color: var(--ink);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease;
         }
         div.stButton > button:hover {
             transform: translateY(-1px);
             border-color: var(--primary);
-            box-shadow: 0 14px 30px rgba(109, 40, 217, 0.16);
+            box-shadow: 0 12px 24px rgba(47, 111, 237, 0.14);
         }
         div.stButton > button[kind="primary"] {
             background: linear-gradient(135deg, var(--primary), var(--primary-strong));
             border-color: var(--primary);
             color: #fff;
         }
-        .nav-button-row div.stButton > button {
-            min-height: 58px;
-            font-size: 1.02rem;
+        .compact-button button,
+        .action-bar div.stButton > button {
+            min-height: 36px;
+            font-size: 0.92rem;
         }
-        .simple-top {
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .topbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 18px;
+            gap: 10px;
+            padding: 0.65rem 0.9rem;
+            margin: 0 0 12px 0;
+            border-radius: 14px;
+            background: var(--panel);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
         }
-        .brand-title {
-            font-size: 1.9rem;
+        .topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .topbar-brand-name {
+            font-size: 1.02rem;
             font-weight: 900;
             color: var(--ink);
-            margin: 0;
+            line-height: 1.05;
         }
-        .brand-subtitle {
+        .topbar-brand-subtitle {
             color: var(--muted);
-            margin-top: 4px;
-            font-size: 0.92rem;
+            font-size: 0.8rem;
+            line-height: 1.15;
+            margin-top: 2px;
+        }
+        .main-card,
+        .module-card,
+        .metric-card,
+        .action-bar {
+            background: var(--panel);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+        }
+        .main-card {
+            padding: 1rem 1.1rem;
+        }
+        .module-card {
+            padding: 1rem;
+            min-height: 168px;
+        }
+        .metric-card {
+            padding: 0.9rem 1rem;
+            min-height: 92px;
+        }
+        .metric-card .value {
+            display: block;
+            margin-top: 0.3rem;
+            font-size: 1.55rem;
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            line-height: 1;
+            color: var(--ink);
+        }
+        .metric-card .label {
+            font-size: 0.79rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .metric-card .hint {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-top: 0.22rem;
+        }
+        .module-card .icon {
+            font-size: 1.35rem;
+            margin-bottom: 0.35rem;
+        }
+        .module-card .title {
+            font-size: 1.02rem;
+            font-weight: 900;
+            color: var(--ink);
+            margin-bottom: 0.25rem;
+        }
+        .module-card .desc {
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.35;
+            min-height: 2.6em;
+        }
+        .section-title {
+            font-size: 1rem;
+            font-weight: 900;
+            color: var(--ink);
+            margin-bottom: 0.25rem;
+        }
+        .muted-text {
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.36rem 0.62rem;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            background: rgba(255, 255, 255, 0.8);
+            color: var(--ink);
+            font-size: 0.8rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .action-bar {
+            margin-top: 0.9rem;
+            padding: 0.95rem;
+        }
+        .home-intro {
+            display: grid;
+            gap: 0.18rem;
+        }
+        .home-hero {
+            display: grid;
+            gap: 0.25rem;
+            margin-bottom: 0.8rem;
+        }
+        .home-hero h1 {
+            font-size: 1.55rem;
+            margin: 0;
+            line-height: 1.1;
+        }
+        .home-hero p {
+            margin: 0;
+            color: var(--muted);
+        }
+        .compact-grid {
+            gap: 10px;
         }
         .dmls-table {
             width: 100%;
@@ -106,8 +253,10 @@ def inject_css() -> None:
             table-layout: fixed;
             background: var(--table-bg);
             color: #f8fafc;
-            border: 1px solid #c4f1ff;
-            font-size: 0.78rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            overflow: hidden;
+            font-size: 0.79rem;
             line-height: 1.25;
         }
         .dmls-table th,
@@ -124,32 +273,20 @@ def inject_css() -> None:
             font-weight: 900;
         }
         .dmls-table tbody tr:nth-child(even) { background: var(--table-alt); }
-        .dmls-table tbody tr:hover { background: #3b3f86; }
+        .dmls-table tbody tr:hover { background: #1f2937; }
         .metric-row {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 12px;
-            margin: 12px 0 16px;
-        }
-        .metric-card {
-            background: #fff;
-            border: 1px solid #dbe3ee;
-            border-radius: 8px;
-            padding: 12px 14px;
-        }
-        .metric-card span { color: var(--muted); font-size: .82rem; }
-        .metric-card strong { display:block; font-size:1.7rem; margin-top:4px; }
-        .action-panel {
-            margin-top: 14px;
-            background: #ffffff;
-            border: 1px solid #dbe3ee;
-            border-radius: 8px;
-            padding: 14px;
+            gap: 10px;
+            margin: 0.6rem 0 1rem;
         }
         @media (max-width: 900px) {
             .metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .topbar { flex-direction: column; align-items: stretch; }
+            .topbar-brand { justify-content: center; }
             .dmls-table { font-size: 0.70rem; }
             .dmls-table th, .dmls-table td { padding: 0.34rem; }
+            .module-card { min-height: 0; }
         }
         </style>
         """,
@@ -196,6 +333,14 @@ def current_user() -> str:
 def current_profile() -> str:
     user = PASSWORD_HASHES.get(current_user(), {})
     return str(user.get("perfil") or "estagiario")
+
+
+def current_profile_label() -> str:
+    return {
+        "admin": "Administrador Geral",
+        "contador": "Contador",
+        "estagiario": "Estagiário",
+    }.get(current_profile(), "Usuário")
 
 
 def is_admin() -> bool:
@@ -344,9 +489,9 @@ def login_screen() -> None:
 def sidebar(metadata: dict) -> str:
     with st.sidebar:
         if LOGO_PATH.exists():
-            st.image(str(LOGO_PATH), width=72)
-        st.markdown(f"**Usuario:** {current_user()}")
-        st.caption(f"Perfil: {current_profile()}")
+            st.image(str(LOGO_PATH), width=54)
+        st.markdown(f"**{escape(current_user())}**")
+        st.caption(current_profile_label())
         st.divider()
         st.markdown("**Navegacao**")
         if st.button("🏠 Home", use_container_width=True):
@@ -355,44 +500,150 @@ def sidebar(metadata: dict) -> str:
             navigate_to("Empresas", "🏢 Empresas")
         if st.button("📋 Demandas", use_container_width=True):
             navigate_to("Demandas", "📋 Demandas")
-        if st.button("⬅️ Voltar", use_container_width=True, disabled=not st.session_state.get("nav_history")):
-            go_back()
-        st.divider()
         competencia = str(metadata.get("competencia_atual") or "2026-05")
         st.caption(f"Competencia: {competencia}")
         st.caption(f"Atualizado: {metadata.get('data_ultima_atualizacao', '')}")
-        if st.button("Recarregar dados"):
-            load_data.clear()
-            st.rerun()
-        if st.button("Sair"):
-            st.session_state.clear()
-            st.rerun()
     return str(metadata.get("competencia_atual") or "2026-05")
 
 
 def header(title: str, subtitle: str = "") -> None:
     st.markdown(
         f"""
-        <div class="simple-top">
-            <div>
-                <div class="brand-title">{title}</div>
-                <div class="brand-subtitle">{subtitle}</div>
-            </div>
+        <div class="main-card">
+            <div class="section-title">{escape(title)}</div>
+            <div class="muted-text">{escape(subtitle)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
+def render_topbar(competencia: str) -> None:
+    page_label = st.session_state.get("page_label", "🏠 Home")
+    c1, c2, c3, c4, c5 = st.columns([2.1, 1.0, 1.0, 0.55, 0.45], vertical_alignment="center")
+    with c1:
+        if LOGO_PATH.exists():
+            st.image(str(LOGO_PATH), width=34)
+        st.markdown(
+            f"""
+            <div class="topbar-brand">
+                <div>
+                    <div class="topbar-brand-name">DMLS Controle</div>
+                    <div class="topbar-brand-subtitle">{escape(str(page_label))} • Competência {escape(str(competencia))}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(f"<span class='status-badge'>Usuário: {escape(current_user())}</span>", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"<span class='status-badge'>Perfil: {escape(current_profile_label())}</span>", unsafe_allow_html=True)
+    with c4:
+        if st.button("🏠 Home", key="topbar_home", use_container_width=True):
+            navigate_to("Home", "🏠 Home")
+    with c5:
+        if st.button("Sair", key="topbar_logout", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+
+
 def render_home() -> None:
-    header("Controle de Empresas", "Painel simples para empresas e demandas.")
-    st.markdown('<div class="nav-button-row">', unsafe_allow_html=True)
+    empresas, demandas, _, metadata = load_data()
+    df_demandas = normalize_demandas(demandas, empresas)
+    total = len(df_demandas)
+    pendentes = int(df_demandas["status"].astype(str).eq("pendente").sum()) if total else 0
+    concluidas = int(df_demandas["status"].astype(str).eq("concluida").sum()) if total else 0
+    progresso = round((concluidas / total) * 100, 0) if total else 0
+    competencia = str(metadata.get("competencia_atual") or "2026-05")
+
+    st.markdown(
+        f"""
+        <div class="home-hero">
+            <h1>Olá, {escape(current_user())}</h1>
+            <p>Competência atual: {escape(competencia)}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="label">Total de demandas</div>
+                <span class="value">{total}</span>
+                <div class="hint">Base carregada em data_web</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m2:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="label">Pendentes</div>
+                <span class="value">{pendentes}</span>
+                <div class="hint">Demandas ainda abertas</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m3:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="label">Concluídas</div>
+                <span class="value">{concluidas}</span>
+                <div class="hint">Demandas finalizadas</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m4:
+        st.markdown(
+            f"""
+            <div class="metric-card">
+                <div class="label">Progresso geral</div>
+                <span class="value">{progresso:.0f}%</span>
+                <div class="hint">Conclusão simples da competência</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<div class="section-title" style="margin-top:0.35rem;">Acesso rápido</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Escolha uma área ativa do painel.</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
-    if c1.button("Cadastro de Empresas", key="home_empresas"):
-        navigate_to("Empresas", "🏢 Empresas")
-    if c2.button("Controle de Demandas", key="home_demandas", type="primary"):
-        navigate_to("Demandas", "📋 Demandas")
-    st.markdown("</div>", unsafe_allow_html=True)
+    with c1:
+        st.markdown(
+            """
+            <div class="module-card">
+                <div class="icon">📋</div>
+                <div class="title">Controle de Demandas</div>
+                <div class="desc">Acompanhe pendências, status e andamento operacional da competência atual.</div>
+                <div class="status-badge">Operação diária</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("📋 Abrir Demandas", key="home_demandas", type="primary"):
+            navigate_to("Demandas", "📋 Demandas")
+    with c2:
+        st.markdown(
+            """
+            <div class="module-card">
+                <div class="icon">🏢</div>
+                <div class="title">Controle de Empresas</div>
+                <div class="desc">Visualize a base de clientes e faça consultas rápidas sem excesso de telas.</div>
+                <div class="status-badge">Base operacional</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("🏢 Abrir Empresas", key="home_empresas"):
+            navigate_to("Empresas", "🏢 Empresas")
 
 
 def sort_controls(df: pd.DataFrame, columns: list[str], key_prefix: str) -> pd.DataFrame:
@@ -587,7 +838,7 @@ ACTIVE_PAGES = {
 
 
 def main() -> None:
-    inject_css()
+    inject_professional_ui_css()
     if not st.session_state.get("usuario"):
         login_screen()
         return
@@ -595,6 +846,7 @@ def main() -> None:
     empresas, demandas, _usuarios, metadata = load_data()
     competencia = sidebar(metadata)
     page = resolve_start_page()
+    render_topbar(competencia)
     renderer = ACTIVE_PAGES[page]["renderer"]
     if page == "Home":
         renderer()
