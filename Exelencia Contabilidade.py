@@ -429,6 +429,99 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     return empresas, demandas, usuarios, metadata
 
 
+def _normalize_empresa_text(value: object) -> str:
+    text = str(value or "").strip()
+    return text
+
+
+def _normalize_ativo(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"1", "1.0", "true", "sim", "ativo", "yes", "y"}:
+        return "1"
+    if text in {"0", "0.0", "false", "nao", "não", "inativo", "no", "n"}:
+        return "0"
+    return "1" if text == "" else text
+
+
+def normalize_empresas_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=[
+            "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
+            "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
+        ])
+
+    frame = df.copy().fillna("")
+    aliases = {
+        "id": "empresa_id",
+        "empresa id": "empresa_id",
+        "cnpj": "cnpj",
+        "documento": "cnpj",
+        "apelido": "apelido",
+        "cliente": "apelido",
+        "razao social": "razao_social",
+        "razao": "razao_social",
+        "nome fantasia": "nome_fantasia",
+        "fantasia": "nome_fantasia",
+        "regime": "regime",
+        "cidade": "cidade",
+        "uf": "uf",
+        "estado": "uf",
+        "contador responsavel": "contador_responsavel",
+        "contador": "contador_responsavel",
+        "responsavel": "contador_responsavel",
+        "ativo": "ativo",
+        "status": "ativo",
+        "atualizado em": "atualizado_em",
+    }
+
+    normalized_columns: dict[str, str] = {}
+    for column in frame.columns:
+        key = normalize_user(column).lower().replace("_", " ").strip()
+        normalized_columns[column] = aliases.get(key, column)
+
+    frame = frame.rename(columns=normalized_columns)
+    for column in [
+        "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
+        "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
+    ]:
+        if column not in frame.columns:
+            frame[column] = ""
+
+    frame["empresa_id"] = frame["empresa_id"].map(_normalize_empresa_text)
+    frame["cnpj"] = frame["cnpj"].map(_normalize_empresa_text)
+    frame["apelido"] = frame["apelido"].map(_normalize_empresa_text)
+    frame["razao_social"] = frame["razao_social"].map(_normalize_empresa_text)
+    frame["nome_fantasia"] = frame["nome_fantasia"].map(_normalize_empresa_text)
+    frame["regime"] = frame["regime"].map(_normalize_empresa_text)
+    frame["cidade"] = frame["cidade"].map(_normalize_empresa_text)
+    frame["uf"] = frame["uf"].map(_normalize_empresa_text).str.upper()
+    frame["contador_responsavel"] = frame["contador_responsavel"].map(_normalize_empresa_text)
+    frame["ativo"] = frame["ativo"].map(_normalize_ativo)
+    frame["atualizado_em"] = frame["atualizado_em"].map(_normalize_empresa_text)
+
+    order = [
+        "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
+        "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
+    ]
+    return frame[order].copy()
+
+
+def load_empresas_web() -> pd.DataFrame:
+    if not EMPRESAS_CSV.exists():
+        return normalize_empresas_df(pd.DataFrame())
+    try:
+        df = pd.read_csv(EMPRESAS_CSV, dtype=str).fillna("")
+    except Exception:
+        return normalize_empresas_df(pd.DataFrame())
+    return normalize_empresas_df(df)
+
+
+def save_empresas_web(df: pd.DataFrame) -> None:
+    EMPRESAS_CSV.parent.mkdir(parents=True, exist_ok=True)
+    normalized = normalize_empresas_df(df)
+    normalized.to_csv(EMPRESAS_CSV, index=False, encoding="utf-8-sig")
+
+
 def normalize_demandas(demandas: pd.DataFrame, empresas: pd.DataFrame) -> pd.DataFrame:
     df = demandas.copy()
     for col in [
@@ -673,39 +766,198 @@ def render_table(df: pd.DataFrame, widths: dict[str, str]) -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
-def render_empresas(empresas: pd.DataFrame) -> None:
-    header("Cadastro de Empresas", "Consulta simples. Cadastro completo fica no Python.")
+def _empresa_status_label(value: str) -> str:
+    return "Ativa" if str(value).strip() in {"1", "1.0", "true", "True", "sim", "SIM"} else "Inativa"
 
-    if empresas.empty:
-        st.info("Nenhuma empresa encontrada.")
+
+def _company_blob(df: pd.DataFrame) -> pd.Series:
+    return (
+        df["cnpj"].astype(str) + " "
+        + df["apelido"].astype(str) + " "
+        + df["razao_social"].astype(str) + " "
+        + df["nome_fantasia"].astype(str) + " "
+        + df["cidade"].astype(str)
+    ).str.upper()
+
+
+def _empresa_detail_html(row: pd.Series) -> str:
+    return f"""
+    <div class="main-card">
+        <div class="section-title">Detalhe rápido</div>
+        <div class="muted-text" style="margin-bottom:0.4rem;">Visão resumida da empresa selecionada.</div>
+        <div class="status-badge">CNPJ: {escape(str(row.get("cnpj", "")))}</div>
+        <div style="height:8px"></div>
+        <div><strong>Razão Social:</strong> {escape(str(row.get("razao_social", "")))}</div>
+        <div><strong>Nome Fantasia:</strong> {escape(str(row.get("nome_fantasia", "")))}</div>
+        <div><strong>Apelido:</strong> {escape(str(row.get("apelido", "")))}</div>
+        <div><strong>Regime:</strong> {escape(str(row.get("regime", "")))}</div>
+        <div><strong>Cidade/UF:</strong> {escape(str(row.get("cidade", "")))} / {escape(str(row.get("uf", "")))}</div>
+        <div><strong>Contador responsável:</strong> {escape(str(row.get("contador_responsavel", "")))}</div>
+        <div><strong>Status:</strong> {_empresa_status_label(str(row.get("ativo", "")))}</div>
+    </div>
+    """
+
+
+def _selected_empresa_frame(empresas: pd.DataFrame, selected_id: str) -> pd.DataFrame:
+    if empresas.empty or not selected_id:
+        return empresas.iloc[0:0].copy()
+    if "empresa_id" in empresas.columns:
+        return empresas.loc[empresas["empresa_id"].astype(str).eq(str(selected_id))].copy()
+    return empresas.loc[empresas["cnpj"].astype(str).eq(str(selected_id))].copy()
+
+
+def render_empresas(empresas: pd.DataFrame) -> None:
+    header("🏢 Controle de Empresas", "Consulta rápida dos clientes exportados pelo sistema principal.")
+
+    empresas_df = load_empresas_web()
+    if empresas_df.empty:
+        st.info("Nenhuma empresa encontrada em data_web/empresas_web.csv.")
         return
 
-    busca = st.text_input("Buscar", placeholder="CNPJ, apelido ou razao social")
-    df = empresas.copy().fillna("")
-    if "ativo" in df.columns:
-        df = df[df["ativo"].astype(str).isin(["1", "1.0", "True", "true", ""])]
+    base_df = empresas_df.copy()
+    df = base_df.copy()
+
+    total_empresas = len(df)
+    ativas = int(df["ativo"].astype(str).eq("1").sum())
+    inativas = int(df["ativo"].astype(str).eq("0").sum())
+    regimes = int(df["regime"].astype(str).replace("", pd.NA).dropna().nunique()) if total_empresas else 0
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.markdown(f"<div class='metric-card'><div class='label'>Total de empresas</div><span class='value'>{total_empresas}</span><div class='hint'>Base operacional carregada</div></div>", unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"<div class='metric-card'><div class='label'>Ativas</div><span class='value'>{ativas}</span><div class='hint'>Clientes em operação</div></div>", unsafe_allow_html=True)
+    with m3:
+        st.markdown(f"<div class='metric-card'><div class='label'>Inativas</div><span class='value'>{inativas}</span><div class='hint'>Clientes suspensos</div></div>", unsafe_allow_html=True)
+    with m4:
+        st.markdown(f"<div class='metric-card'><div class='label'>Regimes</div><span class='value'>{regimes}</span><div class='hint'>Tipos distintos</div></div>", unsafe_allow_html=True)
+
+    c1, c2, c3, c4, c5, c6 = st.columns([2.4, 1.2, 1.2, 1.0, 0.7, 0.9], vertical_alignment="bottom")
+    busca = c1.text_input("Busca geral", placeholder="CNPJ, apelido, razão social, fantasia, cidade", key="empresas_busca")
+    regimes_options = ["Todos"] + sorted([v for v in df["regime"].astype(str).unique().tolist() if v.strip()])
+    regime = c2.selectbox("Regime", regimes_options, key="empresas_regime")
+    responsaveis_options = ["Todos"] + sorted([v for v in df["contador_responsavel"].astype(str).unique().tolist() if v.strip()])
+    responsavel = c3.selectbox("Contador responsável", responsaveis_options, key="empresas_responsavel")
+    status = c4.selectbox("Ativo/Inativo", ["Todos", "Ativas", "Inativas"], key="empresas_status")
+    sort_col = c5.selectbox("Ordenar por", ["apelido", "razao_social", "cnpj", "regime", "cidade", "uf", "contador_responsavel", "ativo"], key="empresas_sort_col")
+    sort_dir = c6.selectbox("Ordem", ["A-Z", "Z-A"], key="empresas_sort_dir")
+
+    action_left, action_right = st.columns([0.9, 2.2], vertical_alignment="center")
+    if action_left.button("🔄 Recarregar", use_container_width=True):
+        st.rerun()
+    st.caption("Exportação CSV disponível para perfis administrativos.")
+
+    df = df.copy()
     if busca:
         q = busca.strip().upper()
-        blob = (
-            df.get("cnpj", "").astype(str) + " "
-            + df.get("apelido", "").astype(str) + " "
-            + df.get("razao_social", "").astype(str) + " "
-            + df.get("nome_fantasia", "").astype(str)
-        ).str.upper()
-        df = df[blob.str.contains(q, regex=False)]
+        df = df[_company_blob(df).str.contains(q, regex=False)]
+    if regime != "Todos":
+        df = df[df["regime"].astype(str).eq(regime)]
+    if responsavel != "Todos":
+        df = df[df["contador_responsavel"].astype(str).eq(responsavel)]
+    if status == "Ativas":
+        df = df[df["ativo"].astype(str).eq("1")]
+    elif status == "Inativas":
+        df = df[df["ativo"].astype(str).eq("0")]
 
-    cols = {
-        "empresa_id": "ID",
-        "cnpj": "CNPJ",
-        "apelido": "Cliente",
-        "razao_social": "Razao Social",
-        "regime": "Regime",
-        "cidade": "Cidade",
-        "uf": "UF",
+    ascending = sort_dir != "Z-A"
+    df = df.sort_values(by=sort_col, kind="mergesort", ascending=ascending)
+
+    view = df.rename(
+        columns={
+            "apelido": "Apelido",
+            "razao_social": "Razão Social",
+            "cnpj": "CNPJ",
+            "regime": "Regime",
+            "cidade": "Cidade",
+            "uf": "UF",
+            "contador_responsavel": "Contador",
+            "ativo": "Ativo",
+        }
+    )[["Apelido", "Razão Social", "CNPJ", "Regime", "Cidade", "UF", "Contador", "Ativo"]]
+    view_display = view.copy()
+    view_display["Ativo"] = view_display["Ativo"].map(_empresa_status_label)
+    view_display = view_display.reset_index(drop=True)
+
+    export_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    action_right.download_button(
+        "📤 Exportar visão filtrada",
+        data=export_bytes,
+        file_name="empresas_visao_filtrada.csv",
+        mime="text/csv",
+        use_container_width=True,
+        disabled=current_profile() == "estagiario",
+    )
+
+    st.markdown('<div style="margin-top:0.55rem;"></div>', unsafe_allow_html=True)
+    st.dataframe(
+        view_display,
+        hide_index=True,
+        use_container_width=True,
+        height=420,
+        column_config={
+            "Apelido": st.column_config.TextColumn("Apelido", width="medium"),
+            "Razão Social": st.column_config.TextColumn("Razão Social", width="large"),
+            "CNPJ": st.column_config.TextColumn("CNPJ", width="medium"),
+            "Regime": st.column_config.TextColumn("Regime", width="medium"),
+            "Cidade": st.column_config.TextColumn("Cidade", width="medium"),
+            "UF": st.column_config.TextColumn("UF", width="small"),
+            "Contador": st.column_config.TextColumn("Contador", width="medium"),
+            "Ativo": st.column_config.TextColumn("Ativo", width="small"),
+        },
+    )
+
+    st.markdown('<div class="main-card" style="margin-top:0.75rem;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Detalhe rápido</div>', unsafe_allow_html=True)
+    if view.empty:
+        st.info("Nenhuma empresa encontrada com os filtros atuais.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    detail_options = df["empresa_id"].astype(str).tolist() if "empresa_id" in df.columns else df["cnpj"].astype(str).tolist()
+    detail_labels = {
+        str(option): f"{str(apelido)} • {str(cnpj)}"
+        for option, apelido, cnpj in zip(detail_options, df["apelido"].astype(str).tolist(), df["cnpj"].astype(str).tolist())
     }
-    view = df[[c for c in cols if c in df.columns]].rename(columns=cols)
-    view = sort_controls(view, list(view.columns), "empresas")
-    render_table(view, {"ID": "7%", "CNPJ": "18%", "Cliente": "22%", "Razao Social": "31%", "Regime": "12%", "Cidade": "8%", "UF": "2%"})
+    selected_detail = st.selectbox(
+        "Ver detalhes",
+        detail_options,
+        format_func=lambda value: detail_labels.get(str(value), str(value)),
+        key="empresas_detail_select",
+    )
+    selected_row = _selected_empresa_frame(df, str(selected_detail))
+    if not selected_row.empty:
+        row = selected_row.iloc[0]
+        st.markdown(_empresa_detail_html(row), unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if current_profile() != "estagiario":
+        with st.expander("Edição simples da empresa selecionada", expanded=False):
+            if selected_row.empty:
+                st.info("Selecione uma empresa para editar.")
+            else:
+                row = selected_row.iloc[0]
+                with st.form("empresa_edicao_simples"):
+                    apelido = st.text_input("Apelido", value=str(row.get("apelido", "")))
+                    cidade = st.text_input("Cidade", value=str(row.get("cidade", "")))
+                    uf = st.text_input("UF", value=str(row.get("uf", "")), max_chars=2)
+                    contador_responsavel = st.text_input("Contador responsável", value=str(row.get("contador_responsavel", "")))
+                    ativo_value = st.selectbox("Ativo", ["1", "0"], index=0 if str(row.get("ativo", "1")) == "1" else 1)
+                    save_simple = st.form_submit_button("💾 Salvar ajustes", type="primary")
+                if save_simple:
+                    updated = base_df.copy()
+                    key_col = "empresa_id" if "empresa_id" in updated.columns else "cnpj"
+                    target_key = str(row.get(key_col, ""))
+                    mask = updated[key_col].astype(str).eq(target_key)
+                    updated.loc[mask, "apelido"] = apelido.strip()
+                    updated.loc[mask, "cidade"] = cidade.strip()
+                    updated.loc[mask, "uf"] = uf.strip().upper()
+                    updated.loc[mask, "contador_responsavel"] = contador_responsavel.strip()
+                    updated.loc[mask, "ativo"] = ativo_value
+                    updated.loc[mask, "atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    save_empresas_web(updated)
+                    st.success("Empresa atualizada com sucesso.")
+                    st.rerun()
 
 
 def can_mark(row: pd.Series) -> bool:
