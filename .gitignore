@@ -23,6 +23,8 @@ data_web/*.log
 data_web/web_action_log.csv
 data_web/marcacoes_web.csv
 data_web/backup_exports/
+desktop.ini
+*.desktop.ini
 
 # Mantidos no Git para o Streamlit carregar a base leve
 !data_web/

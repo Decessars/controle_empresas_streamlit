@@ -202,6 +202,74 @@ def is_admin() -> bool:
     return current_profile() in {"admin", "contador"}
 
 
+ALLOWED_PAGES = {"Home", "Empresas", "Demandas"}
+PAGE_ALIASES = {
+    "HOME": "Home",
+    "EMPRESAS": "Empresas",
+    "DEMANDAS": "Demandas",
+    "HOME ": "Home",
+    "EMPRESAS ": "Empresas",
+    "DEMANDAS ": "Demandas",
+    "AUTOMACAO": "Home",
+    "BACKUP": "Home",
+    "FATURAMENTO": "Home",
+    "PAINEL": "Home",
+    "RELATORIOS": "Home",
+    "USUARIOS": "Home",
+    "MODULOS": "Home",
+}
+
+
+def normalize_page(page: str) -> str:
+    value = str(page or "").strip()
+    if not value:
+        return "Home"
+    if value in ALLOWED_PAGES:
+        return value
+    normalized = normalize_user(value)
+    return PAGE_ALIASES.get(normalized, "Home")
+
+
+def navigate_to(page: str, label: str | None = None, push_history: bool = True) -> None:
+    target = normalize_page(page)
+    current = normalize_page(st.session_state.get("page", "Home"))
+    if push_history and current != target:
+        history = st.session_state.setdefault("nav_history", [])
+        if not history or history[-1] != current:
+            history.append(current)
+        st.session_state["nav_history"] = history[-20:]
+    st.session_state["page"] = target
+    st.session_state["page_label"] = label or target
+    st.query_params["page"] = target
+    st.rerun()
+
+
+def go_back() -> None:
+    history = st.session_state.get("nav_history", [])
+    if history:
+        previous = normalize_page(history.pop())
+        st.session_state["nav_history"] = history
+        navigate_to(previous, previous, push_history=False)
+    else:
+        navigate_to("Home", "🏠 Home", push_history=False)
+
+
+def resolve_start_page() -> str:
+    query_page = st.query_params.get("page", "")
+    if isinstance(query_page, list):
+        query_page = query_page[0] if query_page else ""
+    page = normalize_page(query_page or st.session_state.get("page", "Home"))
+    st.session_state["page"] = page
+    st.session_state["page_label"] = {
+        "Home": "🏠 Home",
+        "Empresas": "🏢 Empresas",
+        "Demandas": "📋 Demandas",
+    }.get(page, page)
+    if str(query_page or "") != page:
+        st.query_params["page"] = page
+    return page
+
+
 @st.cache_data(ttl=60)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
     empresas = pd.read_csv(EMPRESAS_CSV, dtype=str).fillna("") if EMPRESAS_CSV.exists() else pd.DataFrame()
@@ -264,7 +332,10 @@ def login_screen() -> None:
         if submitted:
             if check_login(username, password):
                 st.session_state["usuario"] = normalize_user(username)
-                st.session_state["page"] = "home"
+                st.session_state["nav_history"] = []
+                st.session_state["page"] = "Home"
+                st.session_state["page_label"] = "🏠 Home"
+                st.query_params["page"] = "Home"
                 st.rerun()
             else:
                 st.error("Usuario ou senha invalidos.")
@@ -277,6 +348,16 @@ def sidebar(metadata: dict) -> str:
         st.markdown(f"**Usuario:** {current_user()}")
         st.caption(f"Perfil: {current_profile()}")
         st.divider()
+        st.markdown("**Navegacao**")
+        if st.button("🏠 Home", use_container_width=True):
+            navigate_to("Home", "🏠 Home")
+        if st.button("🏢 Empresas", use_container_width=True):
+            navigate_to("Empresas", "🏢 Empresas")
+        if st.button("📋 Demandas", use_container_width=True):
+            navigate_to("Demandas", "📋 Demandas")
+        if st.button("⬅️ Voltar", use_container_width=True, disabled=not st.session_state.get("nav_history")):
+            go_back()
+        st.divider()
         competencia = str(metadata.get("competencia_atual") or "2026-05")
         st.caption(f"Competencia: {competencia}")
         st.caption(f"Atualizado: {metadata.get('data_ultima_atualizacao', '')}")
@@ -287,11 +368,6 @@ def sidebar(metadata: dict) -> str:
             st.session_state.clear()
             st.rerun()
     return str(metadata.get("competencia_atual") or "2026-05")
-
-
-def go(page: str) -> None:
-    st.session_state["page"] = page
-    st.rerun()
 
 
 def header(title: str, subtitle: str = "") -> None:
@@ -308,14 +384,14 @@ def header(title: str, subtitle: str = "") -> None:
     )
 
 
-def home() -> None:
+def render_home() -> None:
     header("Controle de Empresas", "Painel simples para empresas e demandas.")
     st.markdown('<div class="nav-button-row">', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     if c1.button("Cadastro de Empresas", key="home_empresas"):
-        go("empresas")
+        navigate_to("Empresas", "🏢 Empresas")
     if c2.button("Controle de Demandas", key="home_demandas", type="primary"):
-        go("demandas")
+        navigate_to("Demandas", "📋 Demandas")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -346,10 +422,8 @@ def render_table(df: pd.DataFrame, widths: dict[str, str]) -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
-def empresas_page(empresas: pd.DataFrame) -> None:
+def render_empresas(empresas: pd.DataFrame) -> None:
     header("Cadastro de Empresas", "Consulta simples. Cadastro completo fica no Python.")
-    if st.button("Voltar"):
-        go("home")
 
     if empresas.empty:
         st.info("Nenhuma empresa encontrada.")
@@ -432,10 +506,8 @@ def metric_row(total: int, pendentes: int, concluidas: int) -> None:
     )
 
 
-def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_padrao: str) -> None:
+def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_padrao: str) -> None:
     header("Controle de Demandas", "Mesmas colunas da grade do Python.")
-    if st.button("Voltar"):
-        go("home")
 
     df = normalize_demandas(demandas, empresas)
     if df.empty:
@@ -507,6 +579,13 @@ def demandas_page(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_pa
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+ACTIVE_PAGES = {
+    "Home": {"label": "🏠 Home", "renderer": render_home},
+    "Empresas": {"label": "🏢 Empresas", "renderer": render_empresas},
+    "Demandas": {"label": "📋 Demandas", "renderer": render_demandas},
+}
+
+
 def main() -> None:
     inject_css()
     if not st.session_state.get("usuario"):
@@ -515,13 +594,14 @@ def main() -> None:
 
     empresas, demandas, _usuarios, metadata = load_data()
     competencia = sidebar(metadata)
-    page = st.session_state.get("page", "home")
-    if page == "empresas":
-        empresas_page(empresas)
-    elif page == "demandas":
-        demandas_page(empresas, demandas, competencia)
-    else:
-        home()
+    page = resolve_start_page()
+    renderer = ACTIVE_PAGES[page]["renderer"]
+    if page == "Home":
+        renderer()
+    elif page == "Empresas":
+        renderer(empresas)
+    elif page == "Demandas":
+        renderer(empresas, demandas, competencia)
 
 
 if __name__ == "__main__":
