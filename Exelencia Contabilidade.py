@@ -13,6 +13,18 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+try:
+    from st_aggrid import AgGrid, DataReturnMode, GridOptionsBuilder, GridUpdateMode, JsCode
+
+    AGGRID_AVAILABLE = True
+except Exception:
+    AgGrid = None
+    DataReturnMode = None
+    GridOptionsBuilder = None
+    GridUpdateMode = None
+    JsCode = None
+    AGGRID_AVAILABLE = False
+
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_WEB_DIR = APP_DIR / "data_web"
@@ -522,6 +534,324 @@ def save_empresas_web(df: pd.DataFrame) -> None:
     normalized.to_csv(EMPRESAS_CSV, index=False, encoding="utf-8-sig")
 
 
+def _normalize_demanda_value(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_demanda_flag(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"1", "1.0", "true", "sim", "s", "yes", "y"}:
+        return "1"
+    if text in {"0", "0.0", "false", "nao", "não", "n", "no"}:
+        return "0"
+    return "1" if text == "" else text
+
+
+def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = None) -> pd.DataFrame:
+    columns = [
+        "demanda_id",
+        "empresa_id",
+        "empresa",
+        "cnpj",
+        "competencia",
+        "tipo_codigo",
+        "tipo_demanda",
+        "descricao",
+        "status",
+        "responsavel_operacional",
+        "estagiario_responsavel",
+        "data_limite",
+        "observacao",
+        "concluida_em",
+        "concluida_por",
+        "percentual_grupo",
+        "bloqueada",
+        "motivo_bloqueio",
+        "tempo_min",
+        "tempo_max",
+        "tempo_medio",
+        "estrelas",
+        "peso",
+        "atualizado_em",
+    ]
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    frame = df.copy().fillna("")
+    aliases = {
+        "demanda id": "demanda_id",
+        "empresa id": "empresa_id",
+        "tipo codigo": "tipo_codigo",
+        "tipo demanda": "tipo_demanda",
+        "data limite": "data_limite",
+        "concluida em": "concluida_em",
+        "concluida por": "concluida_por",
+        "percentual grupo": "percentual_grupo",
+        "motivo bloqueio": "motivo_bloqueio",
+        "tempo min": "tempo_min",
+        "tempo max": "tempo_max",
+        "tempo medio": "tempo_medio",
+        "atualizado em": "atualizado_em",
+    }
+    renamed: dict[str, str] = {}
+    for column in frame.columns:
+        key = normalize_user(column).lower().replace("_", " ").strip()
+        renamed[column] = aliases.get(key, column)
+    frame = frame.rename(columns=renamed)
+
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = ""
+
+    if empresas is not None and not empresas.empty:
+        emp = normalize_empresas_df(empresas)
+        if "empresa" not in frame.columns or frame["empresa"].astype(str).str.strip().eq("").all():
+            if "empresa_id" in frame.columns and "empresa_id" in emp.columns:
+                keep_cols = [c for c in ["empresa_id", "apelido", "razao_social", "cnpj"] if c in emp.columns]
+                merged = frame.merge(emp[keep_cols].drop_duplicates("empresa_id"), on="empresa_id", how="left", suffixes=("", "_emp"))
+                if "apelido" in merged.columns:
+                    merged["empresa"] = merged["empresa"].where(merged["empresa"].astype(str).str.strip().ne(""), merged["apelido"].fillna(""))
+                if "razao_social" in merged.columns:
+                    merged["empresa"] = merged["empresa"].where(merged["empresa"].astype(str).str.strip().ne(""), merged["razao_social"].fillna(""))
+                if "cnpj_emp" in merged.columns:
+                    merged["cnpj"] = merged["cnpj"].where(merged["cnpj"].astype(str).str.strip().ne(""), merged["cnpj_emp"].fillna(""))
+                frame = merged
+
+    for column in columns:
+        frame[column] = frame[column].map(_normalize_demanda_value)
+    frame["status"] = frame["status"].replace("", "pendente").str.lower()
+    frame["bloqueada"] = frame["bloqueada"].map(_normalize_demanda_flag)
+    frame["empresa"] = frame["empresa"].where(frame["empresa"].astype(str).str.strip().ne(""), frame["descricao"].fillna(""))
+    frame["descricao"] = frame["descricao"].where(frame["descricao"].astype(str).str.strip().ne(""), frame["tipo_demanda"].fillna(""))
+    frame["tipo_demanda"] = frame["tipo_demanda"].where(frame["tipo_demanda"].astype(str).str.strip().ne(""), frame["descricao"].fillna(""))
+
+    for column in ["concluida_em", "concluida_por", "data_limite", "atualizado_em", "tempo_min", "tempo_max", "tempo_medio", "estrelas", "peso", "percentual_grupo"]:
+        if column in frame.columns:
+            frame[column] = frame[column].map(_normalize_demanda_value)
+
+    estrelas_numeric = pd.to_numeric(frame["estrelas"], errors="coerce")
+    percentual_numeric = pd.to_numeric(frame["percentual_grupo"], errors="coerce")
+    if estrelas_numeric.notna().any():
+        stars = estrelas_numeric.fillna(0).round().astype(int).clip(0, 5)
+    else:
+        stars = (percentual_numeric.fillna(0) / 20).round().astype(int).clip(0, 5)
+    frame["estrelas"] = stars.astype(str)
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "⭐" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+
+    def _tempo_display(row: pd.Series) -> str:
+        tempo_medio = str(row.get("tempo_medio", "")).strip()
+        tempo_min = str(row.get("tempo_min", "")).strip()
+        tempo_max = str(row.get("tempo_max", "")).strip()
+        if tempo_medio:
+            return f"{tempo_medio} min"
+        if tempo_min and tempo_max and tempo_min != tempo_max:
+            return f"{tempo_min}–{tempo_max} min"
+        if tempo_min:
+            return f"{tempo_min} min"
+        if tempo_max:
+            return f"{tempo_max} min"
+        return "—"
+
+    frame["tempo_display"] = frame.apply(_tempo_display, axis=1)
+    frame["responsavel_display"] = frame["responsavel_operacional"].where(
+        frame["responsavel_operacional"].astype(str).str.strip().ne(""),
+        frame["estagiario_responsavel"],
+    )
+    frame["status"] = frame["status"].replace({"concluido": "concluida", "finalizado": "concluida"})
+    frame["status"] = frame["status"].replace("", "pendente")
+    frame["status_visual"] = frame["status"].map(
+        {
+            "pendente": "⚪ Pendente",
+            "em_andamento": "▶️ Em andamento",
+            "concluida": "✅ Concluída",
+            "bloqueada": "🔒 Bloqueada",
+        }
+    ).fillna(frame["status"].astype(str))
+    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
+    return frame[[
+        "demanda_id",
+        "empresa_id",
+        "empresa",
+        "cnpj",
+        "competencia",
+        "tipo_codigo",
+        "tipo_demanda",
+        "descricao",
+        "status",
+        "responsavel_operacional",
+        "estagiario_responsavel",
+        "responsavel_display",
+        "data_limite",
+        "observacao",
+        "concluida_em",
+        "concluida_por",
+        "percentual_grupo",
+        "bloqueada",
+        "motivo_bloqueio",
+        "tempo_min",
+        "tempo_max",
+        "tempo_medio",
+        "tempo_display",
+        "estrelas",
+        "estrelas_visual",
+        "peso",
+        "atualizado_em",
+        "status_visual",
+        "bloqueio_display",
+    ]].copy()
+
+
+@st.cache_data(ttl=60)
+def load_demandas_web() -> pd.DataFrame:
+    if not DEMANDAS_CSV.exists():
+        return normalize_demandas_web(pd.DataFrame())
+    try:
+        df = pd.read_csv(DEMANDAS_CSV, dtype=str).fillna("")
+    except Exception:
+        return normalize_demandas_web(pd.DataFrame())
+    empresas = load_empresas_web()
+    return normalize_demandas_web(df, empresas)
+
+
+@st.cache_data(ttl=60)
+def load_marcacoes_web() -> pd.DataFrame:
+    columns = [
+        "marcacao_id",
+        "demanda_id",
+        "username",
+        "acao",
+        "status_novo",
+        "observacao",
+        "justificativa",
+        "data_hora",
+        "sincronizado",
+    ]
+    if not MARCACOES_CSV.exists():
+        return pd.DataFrame(columns=columns)
+    try:
+        df = pd.read_csv(MARCACOES_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame(columns=columns)
+    for column in columns:
+        if column not in df.columns:
+            df[column] = ""
+    return df[columns].copy()
+
+
+def append_marcacao_web(
+    demanda_id: str,
+    username: str,
+    acao: str,
+    status_novo: str,
+    observacao: str | None = None,
+    justificativa: str | None = None,
+) -> None:
+    MARCACOES_CSV.parent.mkdir(parents=True, exist_ok=True)
+    exists = MARCACOES_CSV.exists()
+    with MARCACOES_CSV.open("a", newline="", encoding="utf-8-sig") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["marcacao_id", "demanda_id", "username", "acao", "status_novo", "observacao", "justificativa", "data_hora", "sincronizado"],
+        )
+        if not exists:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "marcacao_id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
+                "demanda_id": str(demanda_id),
+                "username": normalize_user(username),
+                "acao": str(acao),
+                "status_novo": str(status_novo),
+                "observacao": str(observacao or ""),
+                "justificativa": str(justificativa or ""),
+                "data_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "sincronizado": "0",
+            }
+        )
+    load_marcacoes_web.clear()
+
+
+def append_marcacao(demanda_id: str, status: str, observacao: str) -> None:
+    append_marcacao_web(demanda_id, current_user(), "status", status, observacao=observacao)
+
+
+def can_mark_demanda(row: pd.Series, username: str, role: str) -> bool:
+    role_key = normalize_user(role).lower()
+    user_key = normalize_user(username)
+    if role_key in {"admin", "contador"}:
+        return True
+    responsavel = normalize_user(row.get("responsavel_operacional", ""))
+    estagiario = normalize_user(row.get("estagiario_responsavel", ""))
+    return user_key in {responsavel, estagiario}
+
+
+def apply_marcacoes_to_view(df_demandas: pd.DataFrame, df_marcacoes: pd.DataFrame) -> pd.DataFrame:
+    frame = normalize_demandas_web(df_demandas)
+    if frame.empty or df_marcacoes.empty:
+        return frame
+
+    marks = df_marcacoes.copy().fillna("")
+    marks["data_ordem"] = pd.to_datetime(marks.get("data_hora", ""), errors="coerce")
+    marks["marcacao_ordem"] = marks.get("marcacao_id", "").astype(str)
+    marks = marks.sort_values(["data_ordem", "marcacao_ordem"], kind="mergesort")
+
+    for demanda_id, group in marks.groupby("demanda_id", dropna=False):
+        demanda_id = str(demanda_id)
+        mask = frame["demanda_id"].astype(str).eq(demanda_id)
+        if not mask.any():
+            continue
+        row_idx = frame.index[mask][0]
+        row = frame.loc[row_idx].copy()
+        for _, mark in group.iterrows():
+            acao = normalize_user(mark.get("acao", "")).lower()
+            status_novo = str(mark.get("status_novo", "")).strip().lower()
+            observacao = str(mark.get("observacao", "")).strip()
+            justificativa = str(mark.get("justificativa", "")).strip()
+            data_hora = str(mark.get("data_hora", "")).strip()
+            if acao in {"concluir", "concluir_selecionadas", "marcar_concluida"} or status_novo == "concluida":
+                if row.get("bloqueada", "0") != "1":
+                    row["status"] = "concluida"
+                    row["concluida_em"] = data_hora or row.get("concluida_em", "")
+                    row["concluida_por"] = str(mark.get("username", "")).strip() or row.get("concluida_por", "")
+            elif acao in {"em_andamento", "marcar_em_andamento"} or status_novo == "em_andamento":
+                if row.get("bloqueada", "0") != "1":
+                    row["status"] = "em_andamento"
+                    row["concluida_em"] = ""
+                    row["concluida_por"] = ""
+            elif acao in {"desmarcar", "reabrir"} or status_novo == "pendente":
+                if row.get("bloqueada", "0") != "1":
+                    row["status"] = "pendente"
+                    row["concluida_em"] = ""
+                    row["concluida_por"] = ""
+            elif acao in {"observacao", "salvar_observacao"}:
+                if observacao:
+                    row["observacao"] = observacao
+            if justificativa:
+                row["observacao"] = f"{row.get('observacao', '').strip()} | Justificativa: {justificativa}".strip(" |")
+            if observacao and acao not in {"observacao", "salvar_observacao"}:
+                row["observacao"] = observacao
+            row["atualizado_em"] = data_hora or row.get("atualizado_em", "")
+        for column in frame.columns:
+            frame.at[row_idx, column] = row.get(column, frame.at[row_idx, column])
+
+    frame["status"] = frame["status"].replace("", "pendente")
+    frame["status_visual"] = frame["status"].map(
+        {
+            "pendente": "⚪ Pendente",
+            "em_andamento": "▶️ Em andamento",
+            "concluida": "✅ Concluída",
+            "bloqueada": "🔒 Bloqueada",
+        }
+    ).fillna(frame["status"].astype(str))
+    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
+    frame["responsavel_display"] = frame["responsavel_operacional"].where(
+        frame["responsavel_operacional"].astype(str).str.strip().ne(""),
+        frame["estagiario_responsavel"],
+    )
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "⭐" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+    return frame
+
+
 def normalize_demandas(demandas: pd.DataFrame, empresas: pd.DataFrame) -> pd.DataFrame:
     df = demandas.copy()
     for col in [
@@ -642,8 +972,8 @@ def render_topbar(competencia: str) -> None:
 
 
 def render_home() -> None:
-    empresas, demandas, _, metadata = load_data()
-    df_demandas = normalize_demandas(demandas, empresas)
+    empresas, _, _, metadata = load_data()
+    df_demandas = build_demandas_view(load_demandas_web(), current_user(), current_profile(), empresas)
     total = len(df_demandas)
     pendentes = int(df_demandas["status"].astype(str).eq("pendente").sum()) if total else 0
     concluidas = int(df_demandas["status"].astype(str).eq("concluida").sum()) if total else 0
@@ -1009,77 +1339,416 @@ def metric_row(total: int, pendentes: int, concluidas: int) -> None:
     )
 
 
-def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_padrao: str) -> None:
-    header("Controle de Demandas", "Mesmas colunas da grade do Python.")
+def render_demandas_metrics(total: int, pendentes: int, concluidas: int, minhas: int) -> None:
+    geral_pct = round((concluidas / total) * 100, 0) if total else 0
+    meu_pct = round((minhas / total) * 100, 0) if total else 0
+    top_row = st.columns(3)
+    bottom_row = st.columns(3)
+    cards = [
+        ("Total", total, "Demandas visíveis na competência"),
+        ("Pendentes", pendentes, "Ainda abertas para trabalho"),
+        ("Concluídas", concluidas, "Finalizadas no painel"),
+        ("Minhas", minhas, "Sob sua responsabilidade"),
+        ("Meu percentual", f"{meu_pct:.0f}%", "Minha participação sobre o total"),
+        ("Percentual geral", f"{geral_pct:.0f}%", "Conclusão simples da tela"),
+    ]
+    for idx, (label, value, hint) in enumerate(cards):
+        container = top_row[idx] if idx < 3 else bottom_row[idx - 3]
+        with container:
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="label">{escape(str(label))}</div>
+                    <span class="value">{escape(str(value))}</span>
+                    <div class="hint">{escape(str(hint))}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    df = normalize_demandas(demandas, empresas)
-    if df.empty:
+
+def _demanda_status_value(value: str) -> str:
+    text = normalize_user(value).lower()
+    if text in {"concluida", "concluido", "finalizado"}:
+        return "concluida"
+    if text in {"em_andamento", "andamento", "andando"}:
+        return "em_andamento"
+    if text in {"bloqueada", "bloqueado"}:
+        return "bloqueada"
+    return "pendente"
+
+
+def build_demandas_view(df: pd.DataFrame, username: str, role: str, empresas: pd.DataFrame | None = None) -> pd.DataFrame:
+    frame = apply_marcacoes_to_view(normalize_demandas_web(df, empresas), load_marcacoes_web())
+    if frame.empty:
+        return frame
+
+    user_key = normalize_user(username)
+    role_key = normalize_user(role).lower()
+    frame["status"] = frame["status"].map(_demanda_status_value)
+    frame.loc[frame["bloqueada"].astype(str).eq("1"), "status"] = "bloqueada"
+    frame["status_visual"] = frame["status"].map(
+        {
+            "pendente": "⚪ Pendente",
+            "em_andamento": "▶️ Em andamento",
+            "concluida": "✅ Concluída",
+            "bloqueada": "🔒 Bloqueada",
+        }
+    ).fillna(frame["status"].astype(str))
+    frame["minha_demanda"] = (
+        frame["responsavel_operacional"].astype(str).map(normalize_user).eq(user_key)
+        | frame["estagiario_responsavel"].astype(str).map(normalize_user).eq(user_key)
+    )
+    frame["editavel"] = frame.apply(lambda row: can_mark_demanda(row, username, role) and str(row.get("bloqueada", "0")) != "1", axis=1)
+    frame["selecionavel"] = True
+    frame["responsavel_display"] = frame["responsavel_display"].where(
+        frame["responsavel_display"].astype(str).str.strip().ne(""),
+        frame["responsavel_operacional"],
+    )
+    frame["dificuldade"] = frame["estrelas_visual"]
+    frame["demanda_display"] = frame["descricao"].where(frame["descricao"].astype(str).str.strip().ne(""), frame["tipo_demanda"])
+    frame["bloqueio_display"] = frame["bloqueio_display"].where(frame["bloqueio_display"].astype(str).str.strip().ne(""), "")
+    frame["status_visual"] = frame["status_visual"].where(frame["status_visual"].astype(str).str.strip().ne(""), frame["status"].astype(str))
+    if role_key in {"admin", "contador"}:
+        frame["editavel"] = frame["bloqueada"].astype(str).ne("1")
+    return frame
+
+
+def _demandas_allowed_subset(df: pd.DataFrame, selected_ids: list[str], username: str, role: str) -> tuple[pd.DataFrame, int, int]:
+    if not selected_ids:
+        return df.iloc[0:0].copy(), 0, 0
+    subset = df[df["demanda_id"].astype(str).isin([str(value) for value in selected_ids])].copy()
+    blocked = int(subset["bloqueada"].astype(str).eq("1").sum()) if not subset.empty else 0
+    allowed_mask = subset.apply(lambda row: can_mark_demanda(row, username, role) and str(row.get("bloqueada", "0")) != "1", axis=1)
+    denied = int((~allowed_mask).sum()) if not subset.empty else 0
+    return subset.loc[allowed_mask].copy(), denied, blocked
+
+
+def _demandas_apply_batch(
+    df: pd.DataFrame,
+    selected_ids: list[str],
+    username: str,
+    role: str,
+    action: str,
+    observacao: str = "",
+    justificativa: str = "",
+) -> tuple[int, int, int]:
+    targets, denied, blocked = _demandas_allowed_subset(df, selected_ids, username, role)
+    if targets.empty:
+        return 0, denied, blocked
+
+    action = action.lower().strip()
+    for _, row in targets.iterrows():
+        demanda_id = str(row.get("demanda_id", ""))
+        if action == "concluir":
+            append_marcacao_web(demanda_id, username, "concluir", "concluida", observacao=observacao or str(row.get("observacao", "")))
+        elif action == "em_andamento":
+            append_marcacao_web(demanda_id, username, "em_andamento", "em_andamento", observacao=observacao or str(row.get("observacao", "")))
+        elif action == "desmarcar":
+            append_marcacao_web(demanda_id, username, "desmarcar", "pendente", observacao=observacao or str(row.get("observacao", "")), justificativa=justificativa)
+        elif action == "observacao":
+            append_marcacao_web(demanda_id, username, "observacao", str(row.get("status", "pendente")), observacao=observacao)
+    load_marcacoes_web.clear()
+    return int(len(targets)), denied, blocked
+
+
+def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
+    grid_df = df[[
+        "demanda_id",
+        "Empresa",
+        "Demanda",
+        "Responsável",
+        "Status",
+        "Tempo",
+        "Dificuldade",
+        "Observação",
+        "Concluída em",
+        "Concluída por",
+        "Bloqueio",
+        "minha_demanda",
+        "editavel",
+        "bloqueada",
+        "responsavel_operacional",
+        "estagiario_responsavel",
+    ]].copy()
+    if not AGGRID_AVAILABLE:
+        st.info("AgGrid indisponível. Usando fallback em tabela editável.")
+        fallback = grid_df.copy()
+        fallback.insert(0, "Selecionar", False)
+        edited = st.data_editor(
+            fallback,
+            hide_index=True,
+            use_container_width=True,
+            height=500,
+            column_config={
+                "Selecionar": st.column_config.CheckboxColumn("Selecionar"),
+                "demanda_id": st.column_config.TextColumn("demanda_id", disabled=True),
+            },
+            disabled=[col for col in fallback.columns if col not in {"Selecionar", "Observação"}],
+            key="demandas_fallback_editor",
+        )
+        selected_ids = edited.loc[edited["Selecionar"].astype(bool), "demanda_id"].astype(str).tolist()
+        return selected_ids
+
+    builder = GridOptionsBuilder.from_dataframe(grid_df)
+    builder.configure_default_column(sortable=True, filter=True, resizable=True, floatingFilter=True)
+    builder.configure_selection("multiple", use_checkbox=True, header_checkbox=True)
+    builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
+    builder.configure_grid_options(
+        rowHeight=36,
+        domLayout="normal",
+        suppressRowClickSelection=True,
+        tooltipShowDelay=0,
+    )
+    for column in ["demanda_id", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
+        builder.configure_column(column, hide=True)
+    builder.configure_column("Empresa", minWidth=180)
+    builder.configure_column("Demanda", minWidth=220)
+    builder.configure_column("Responsável", minWidth=120)
+    builder.configure_column("Status", minWidth=110)
+    builder.configure_column("Tempo", minWidth=95)
+    builder.configure_column("Dificuldade", minWidth=90)
+    builder.configure_column("Observação", minWidth=220)
+    builder.configure_column("Concluída em", minWidth=145)
+    builder.configure_column("Concluída por", minWidth=130)
+    builder.configure_column("Bloqueio", minWidth=180)
+    if JsCode is not None:
+        row_style = JsCode(
+            """
+            function(params) {
+                if (params.data && String(params.data.bloqueada) === '1') {
+                    return {backgroundColor: '#fff1f2', color: '#7f1d1d'};
+                }
+                if (params.data && (params.data.minha_demanda === true || String(params.data.minha_demanda).toLowerCase() === 'true')) {
+                    return {backgroundColor: '#eff6ff'};
+                }
+                return {};
+            }
+            """
+        )
+        builder.configure_grid_options(getRowStyle=row_style)
+    grid_options = builder.build()
+    response = AgGrid(
+        grid_df,
+        gridOptions=grid_options,
+        height=520,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        data_return_mode=DataReturnMode.AS_INPUT,
+        allow_unsafe_jscode=True,
+        fit_columns_on_grid_load=True,
+        enable_enterprise_modules=False,
+        theme="streamlit",
+        key="demandas_aggrid",
+    )
+    selected_rows = response.get("selected_rows", []) or []
+    return [str(row.get("demanda_id", "")) for row in selected_rows if row.get("demanda_id", "")]
+
+
+def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> None:
+    if not selected_ids:
+        st.markdown(
+            """
+            <div class="main-card">
+                <div class="section-title">Detalhes da demanda selecionada</div>
+                <div class="muted-text">Selecione uma ou mais demandas na tabela para ver os detalhes aqui.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+    selected = df[df["demanda_id"].astype(str).isin([str(value) for value in selected_ids])].copy()
+    if selected.empty:
+        return
+    row = selected.iloc[0]
+    st.markdown(
+        f"""
+        <div class="main-card">
+            <div class="section-title">Detalhes da demanda selecionada</div>
+            <div class="muted-text" style="margin-bottom:0.4rem;">{escape(str(len(selected_ids)))} demanda(s) selecionada(s). Mostrando a primeira seleção.</div>
+            <div><strong>Empresa:</strong> {escape(str(row.get("Empresa", row.get("empresa", ""))))}</div>
+            <div><strong>Tipo:</strong> {escape(str(row.get("Demanda", row.get("tipo_demanda", ""))))}</div>
+            <div><strong>Responsável:</strong> {escape(str(row.get("Responsável", row.get("responsavel_display", ""))))}</div>
+            <div><strong>Status:</strong> {escape(str(row.get("Status", row.get("status_visual", ""))))}</div>
+            <div><strong>Tempo:</strong> {escape(str(row.get("Tempo", row.get("tempo_display", ""))))}</div>
+            <div><strong>Estrelas:</strong> {escape(str(row.get("Dificuldade", row.get("estrelas_visual", ""))))}</div>
+            <div><strong>Observação:</strong> {escape(str(row.get("Observação", row.get("observacao", ""))))}</div>
+            <div><strong>Bloqueio:</strong> {escape(str(row.get("Bloqueio", row.get("bloqueio_display", ""))))}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_padrao: str) -> None:
+    header("📋 Controle de Demandas", "Visualize, filtre e marque as demandas operacionais da competência.")
+
+    username = current_user()
+    role = current_profile()
+    base_demandas = load_demandas_web()
+    view = build_demandas_view(base_demandas, username, role, empresas)
+    if view.empty:
         st.info("Nenhuma demanda encontrada.")
         return
 
-    f1, f2, f3, f4 = st.columns([0.9, 1.4, 1, 1])
-    competencia = f1.text_input("Competencia", value=competencia_padrao)
-    busca = f2.text_input("Buscar", placeholder="cliente, CNPJ, tipo")
-    status = f3.selectbox("Status", ["Todos", "pendente", "em_andamento", "concluida"])
-    minhas = f4.checkbox("So minhas", value=not is_admin())
+    if "demandas_only_mine" not in st.session_state:
+        st.session_state["demandas_only_mine"] = False
+    if "demandas_status_filter" not in st.session_state:
+        st.session_state["demandas_status_filter"] = "Todos"
 
-    if competencia:
-        df = df[df["competencia"].astype(str).eq(competencia)].copy()
+    competencias_options = sorted([v for v in view["competencia"].astype(str).dropna().unique().tolist() if v.strip()])
+    competence_default = str(competencia_padrao or (competencias_options[0] if competencias_options else ""))
+    status_options = ["Todos", "pendente", "em_andamento", "concluida", "bloqueada"]
+    responsavel_options = ["Todos"] + sorted([v for v in pd.concat([view["responsavel_operacional"], view["estagiario_responsavel"]]).astype(str).unique().tolist() if v.strip()])
+    empresa_options = ["Todas"] + sorted([v for v in view["empresa"].astype(str).unique().tolist() if v.strip()])
+    tipo_options = ["Todos"] + sorted([v for v in view["tipo_demanda"].astype(str).unique().tolist() if v.strip()])
+
+    f1, f2, f3, f4, f5 = st.columns([1.05, 1.1, 1.15, 1.15, 1.55], vertical_alignment="bottom")
+    competencia = f1.selectbox("Competência", competencias_options or [competence_default], index=(competencias_options.index(competence_default) if competence_default in competencias_options else 0), key="demandas_competencia")
+    status = f2.selectbox("Status", status_options, index=status_options.index(st.session_state.get("demandas_status_filter", "Todos")) if st.session_state.get("demandas_status_filter", "Todos") in status_options else 0, key="demandas_status")
+    st.session_state["demandas_status_filter"] = status
+    responsavel = f3.selectbox("Responsável / Estagiário", responsavel_options, key="demandas_responsavel")
+    empresa = f4.selectbox("Empresa", empresa_options, key="demandas_empresa")
+    tipo = f5.selectbox("Tipo de demanda", tipo_options, key="demandas_tipo")
+
+    toggle_col1, toggle_col2, action_col = st.columns([0.9, 0.9, 2.4], vertical_alignment="center")
+    if toggle_col1.button("🎯 Só minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
+        st.session_state["demandas_only_mine"] = True
+        st.rerun()
+    if toggle_col2.button("👥 Todas", use_container_width=True, type="primary" if not st.session_state.get("demandas_only_mine") else "secondary"):
+        st.session_state["demandas_only_mine"] = False
+        st.rerun()
+    if action_col.button("🔄 Recarregar", use_container_width=True):
+        load_demandas_web.clear()
+        load_marcacoes_web.clear()
+        st.rerun()
+
+    filtro_mask = view["competencia"].astype(str).eq(str(competencia))
     if status != "Todos":
-        df = df[df["status"].astype(str).eq(status)].copy()
-    if busca:
-        q = busca.strip().upper()
-        blob = (df["empresa"] + " " + df["cnpj"] + " " + df["tipo_demanda"] + " " + df["observacao"]).str.upper()
-        df = df[blob.str.contains(q, regex=False)].copy()
-    if minhas:
-        user = current_user()
-        df = df[
-            df["responsavel_operacional"].astype(str).map(normalize_user).eq(user)
-            | df["estagiario_responsavel"].astype(str).map(normalize_user).eq(user)
-        ].copy()
+        filtro_mask &= view["status"].astype(str).eq(status)
+    if responsavel != "Todos":
+        filtro_mask &= (
+            view["responsavel_operacional"].astype(str).eq(responsavel)
+            | view["estagiario_responsavel"].astype(str).eq(responsavel)
+        )
+    if empresa != "Todas":
+        filtro_mask &= view["empresa"].astype(str).eq(empresa)
+    if tipo != "Todos":
+        filtro_mask &= view["tipo_demanda"].astype(str).eq(tipo)
+    if st.session_state.get("demandas_only_mine"):
+        filtro_mask &= view["minha_demanda"]
 
-    total = len(df)
-    pendentes = int(df["status"].astype(str).eq("pendente").sum()) if total else 0
-    concluidas = int(df["status"].astype(str).eq("concluida").sum()) if total else 0
-    metric_row(total, pendentes, concluidas)
-
-    if df.empty:
+    filtered = view.loc[filtro_mask].copy()
+    if filtered.empty:
         st.info("Nenhuma demanda encontrada com os filtros atuais.")
         return
 
-    grid = df.rename(
-        columns={
-            "demanda_id": "ID",
-            "empresa": "Cliente",
-            "cnpj": "CNPJ",
-            "tipo_demanda": "Tipo",
-            "competencia": "Competencia",
-            "observacao": "Observacao",
-        }
-    )[["ID", "Cliente", "CNPJ", "Tipo", "Competencia", "Observacao"]]
-    grid = sort_controls(grid, list(grid.columns), "demandas")
-    render_table(grid, {"ID": "7%", "Cliente": "22%", "CNPJ": "18%", "Tipo": "29%", "Competencia": "10%", "Observacao": "14%"})
+    total = len(filtered)
+    pendentes = int(filtered["status"].astype(str).eq("pendente").sum())
+    concluidas = int(filtered["status"].astype(str).eq("concluida").sum())
+    minhas = int(filtered["minha_demanda"].astype(bool).sum())
+    render_demandas_metrics(total, pendentes, concluidas, minhas)
 
-    st.markdown('<div class="action-panel">', unsafe_allow_html=True)
-    selected_id = st.selectbox(
-        "Selecionar demanda para marcar",
-        df["demanda_id"].astype(str).tolist(),
-        format_func=lambda did: f"{did} - {df.loc[df['demanda_id'].astype(str).eq(str(did)), 'empresa'].iloc[0]}",
+    search_text = st.text_input("Busca rápida", placeholder="Empresa, demanda, observação ou CNPJ", key="demandas_busca_rapida")
+    if search_text:
+        q = search_text.strip().upper()
+        blob = (
+            filtered["empresa"].astype(str) + " " +
+            filtered["tipo_demanda"].astype(str) + " " +
+            filtered["descricao"].astype(str) + " " +
+            filtered["observacao"].astype(str) + " " +
+            filtered["cnpj"].astype(str)
+        ).str.upper()
+        filtered = filtered[blob.str.contains(q, regex=False)].copy()
+        if filtered.empty:
+            st.info("Nenhuma demanda encontrada com a busca rápida atual.")
+            return
+
+    st.markdown('<div class="action-bar">', unsafe_allow_html=True)
+    selected_ids = _render_demandas_grid_aggrid(
+        filtered.rename(
+            columns={
+                "empresa": "Empresa",
+                "demanda_display": "Demanda",
+                "responsavel_display": "Responsável",
+                "status_visual": "Status",
+                "tempo_display": "Tempo",
+                "estrelas_visual": "Dificuldade",
+                "observacao": "Observação",
+                "concluida_em": "Concluída em",
+                "concluida_por": "Concluída por",
+                "bloqueio_display": "Bloqueio",
+            }
+        )
     )
-    selected = df.loc[df["demanda_id"].astype(str).eq(str(selected_id))].iloc[0]
-    allowed = can_mark(selected)
-    if not allowed:
-        st.warning("Somente o responsavel desta demanda pode marcar.")
-
-    obs = st.text_area("Observacao curta", value=str(selected.get("observacao", "")), height=80)
-    c1, c2 = st.columns(2)
-    if c1.button("Concluir", disabled=not allowed, type="primary"):
-        append_marcacao(str(selected_id), "concluida", obs)
-        st.success("Marcacao registrada.")
-    if c2.button("Em andamento", disabled=not allowed):
-        append_marcacao(str(selected_id), "em_andamento", obs)
-        st.success("Marcacao registrada.")
     st.markdown("</div>", unsafe_allow_html=True)
+    st.session_state["demandas_selected_ids"] = selected_ids
+
+    selected_df = filtered[filtered["demanda_id"].astype(str).isin([str(value) for value in selected_ids])].copy()
+    selected_count = len(selected_df)
+
+    action_left, action_center, action_right = st.columns([1.1, 1.1, 2.8], vertical_alignment="center")
+    justification = action_center.text_input("Justificativa para desmarcar", key="demandas_justificativa", placeholder="Explique por que está desmarcando.")
+    observation_text = action_right.text_area("Observação para selecionadas", key="demandas_observacao_text", height=90, placeholder="Escreva uma observação curta para aplicar nas demandas selecionadas.")
+    if action_left.button("✅ Concluir selecionadas", use_container_width=True, type="primary"):
+        if not selected_ids:
+            st.warning("Selecione ao menos uma demanda na tabela.")
+        else:
+            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "concluir", observacao=observation_text)
+            if applied:
+                st.toast("✅ Demandas concluídas com sucesso")
+            if denied:
+                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+            if blocked:
+                st.warning("Algumas demandas estão bloqueadas.")
+            if applied:
+                st.rerun()
+    if action_center.button("↩️ Desmarcar selecionadas", use_container_width=True):
+        if not selected_ids:
+            st.warning("Selecione ao menos uma demanda na tabela.")
+        elif not justification.strip():
+            st.error("Explique por que está desmarcando.")
+        else:
+            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "desmarcar", observacao=observation_text, justificativa=justification)
+            if applied:
+                st.toast("↩️ Demandas desmarcadas com sucesso")
+            if denied:
+                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+            if blocked:
+                st.warning("Algumas demandas estão bloqueadas.")
+            if applied:
+                st.session_state["demandas_justificativa"] = ""
+                st.rerun()
+    if action_right.button("▶️ Marcar em andamento", use_container_width=True):
+        if not selected_ids:
+            st.warning("Selecione ao menos uma demanda na tabela.")
+        else:
+            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "em_andamento", observacao=observation_text)
+            if applied:
+                st.toast("▶️ Demandas marcadas como em andamento")
+            if denied:
+                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+            if blocked:
+                st.warning("Algumas demandas estão bloqueadas.")
+            if applied:
+                st.rerun()
+    if action_right.button("📝 Salvar observações", use_container_width=True):
+        if not selected_ids:
+            st.warning("Selecione ao menos uma demanda na tabela.")
+        elif not observation_text.strip():
+            st.error("Informe uma observação para aplicar.")
+        else:
+            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "observacao", observacao=observation_text)
+            if applied:
+                st.toast("📝 Observações aplicadas com sucesso")
+            if denied:
+                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+            if blocked:
+                st.warning("Algumas demandas estão bloqueadas.")
+            if applied:
+                st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    _render_selected_demand_panel(filtered, selected_ids)
 
 
 ACTIVE_PAGES = {
