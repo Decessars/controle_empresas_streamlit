@@ -1597,7 +1597,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     response = AgGrid(
         grid_df,
         gridOptions=grid_options,
-        height=520,
+        height=860,
         update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED,
         data_return_mode=DataReturnMode.AS_INPUT,
         allow_unsafe_jscode=True,
