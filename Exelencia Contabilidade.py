@@ -255,6 +255,43 @@ def inject_professional_ui_css() -> None:
             font-weight: 700;
             white-space: nowrap;
         }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.28rem 0.7rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 0.82rem;
+            font-weight: 800;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .status-pill--pendente {
+            background: rgba(251, 191, 36, 0.18);
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.45);
+        }
+        .status-pill--em-andamento {
+            background: rgba(59, 130, 246, 0.16);
+            color: #1d4ed8;
+            border-color: rgba(96, 165, 250, 0.45);
+        }
+        .status-pill--concluida {
+            background: rgba(34, 197, 94, 0.16);
+            color: #166534;
+            border-color: rgba(74, 222, 128, 0.45);
+        }
+        .status-pill--bloqueada {
+            background: rgba(248, 113, 113, 0.16);
+            color: #b91c1c;
+            border-color: rgba(248, 113, 113, 0.45);
+        }
+        .status-pill--default {
+            background: rgba(148, 163, 184, 0.18);
+            color: #334155;
+            border-color: rgba(148, 163, 184, 0.45);
+        }
         .action-bar {
             margin-top: 0.9rem;
             padding: 0.95rem;
@@ -1578,20 +1615,82 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             }
             """
         )
+        status_cell_style = JsCode(
+            """
+            function(params) {
+                var value = String(params.value || '').trim();
+                if (!value) {
+                    return {
+                        backgroundColor: 'rgba(148, 163, 184, 0.18)',
+                        color: '#334155',
+                        border: '1px solid rgba(148, 163, 184, 0.45)',
+                        fontWeight: '800',
+                        textAlign: 'center'
+                    };
+                }
+                var normalized = value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+                if (normalized === 'pendente') {
+                    return {
+                        backgroundColor: 'rgba(251, 191, 36, 0.18)',
+                        color: '#92400e',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                        fontWeight: '800',
+                        textAlign: 'center'
+                    };
+                }
+                if (normalized === 'em andamento') {
+                    return {
+                        backgroundColor: 'rgba(59, 130, 246, 0.16)',
+                        color: '#1d4ed8',
+                        border: '1px solid rgba(96, 165, 250, 0.45)',
+                        fontWeight: '800',
+                        textAlign: 'center'
+                    };
+                }
+                if (normalized === 'concluida') {
+                    return {
+                        backgroundColor: 'rgba(34, 197, 94, 0.16)',
+                        color: '#166534',
+                        border: '1px solid rgba(74, 222, 128, 0.45)',
+                        fontWeight: '800',
+                        textAlign: 'center'
+                    };
+                }
+                if (normalized === 'bloqueada') {
+                    return {
+                        backgroundColor: 'rgba(248, 113, 113, 0.16)',
+                        color: '#b91c1c',
+                        border: '1px solid rgba(248, 113, 113, 0.45)',
+                        fontWeight: '800',
+                        textAlign: 'center'
+                    };
+                }
+                return {
+                    backgroundColor: 'rgba(148, 163, 184, 0.18)',
+                    color: '#334155',
+                    border: '1px solid rgba(148, 163, 184, 0.45)',
+                    fontWeight: '800',
+                    textAlign: 'center'
+                };
+            }
+            """
+        )
         builder.configure_column(
             "Status",
-            minWidth=140,
+            minWidth=170,
             editable=status_editable,
             cellEditor="agSelectCellEditor",
             cellEditorParams={"values": status_options},
+            cellStyle=status_cell_style,
         )
     else:
         builder.configure_column(
             "Status",
-            minWidth=140,
+            minWidth=170,
             editable=True,
             cellEditor="agSelectCellEditor",
             cellEditorParams={"values": status_options},
+            cellStyle=status_cell_style,
         )
     builder.configure_column("Tempo", minWidth=95)
     builder.configure_column("Dificuldade", minWidth=90)
