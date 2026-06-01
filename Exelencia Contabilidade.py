@@ -87,6 +87,17 @@ def inject_professional_ui_css() -> None:
                 var(--bg);
             color: var(--ink);
         }
+        div[data-testid="stDecoration"],
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        #MainMenu,
+        footer {
+            display: none !important;
+        }
+        .stApp {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
         .block-container {
             padding-top: 0.85rem;
             padding-bottom: 1rem;
