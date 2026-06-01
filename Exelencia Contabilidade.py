@@ -1532,7 +1532,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     builder = GridOptionsBuilder.from_dataframe(grid_df)
     builder.configure_default_column(sortable=False, filter=True, resizable=True, floatingFilter=True, editable=False)
     builder.configure_selection("multiple", use_checkbox=True, header_checkbox=True)
-    builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
+    builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=100)
     builder.configure_grid_options(
         rowHeight=36,
         domLayout="normal",
