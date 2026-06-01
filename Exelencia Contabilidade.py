@@ -667,6 +667,14 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
             "bloqueada": "🔒 Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
+    frame["status_label"] = frame["status"].map(
+        {
+            "pendente": "Pendente",
+            "em_andamento": "Em andamento",
+            "concluida": "Concluída",
+            "bloqueada": "Bloqueada",
+        }
+    ).fillna(frame["status"].astype(str))
     frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
     return frame[[
         "demanda_id",
@@ -688,6 +696,7 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
         "percentual_grupo",
         "bloqueada",
         "motivo_bloqueio",
+        "status_label",
         "tempo_min",
         "tempo_max",
         "tempo_medio",
@@ -841,6 +850,14 @@ def apply_marcacoes_to_view(df_demandas: pd.DataFrame, df_marcacoes: pd.DataFram
             "em_andamento": "▶️ Em andamento",
             "concluida": "✅ Concluída",
             "bloqueada": "🔒 Bloqueada",
+        }
+    ).fillna(frame["status"].astype(str))
+    frame["status_label"] = frame["status"].map(
+        {
+            "pendente": "Pendente",
+            "em_andamento": "Em andamento",
+            "concluida": "Concluída",
+            "bloqueada": "Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
     frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
@@ -1453,6 +1470,13 @@ def _demandas_apply_batch(
 
 
 def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
+    status_options = ["Pendente", "Em andamento", "Concluída"]
+    status_to_internal = {
+        "Pendente": "pendente",
+        "Em andamento": "em_andamento",
+        "Concluída": "concluida",
+    }
+    internal_to_status = {value: key for key, value in status_to_internal.items()}
     visible_order = [
         "Empresa",
         "Demanda",
@@ -1467,6 +1491,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     ]
     hidden_order = [
         "demanda_id",
+        "status",
         "minha_demanda",
         "editavel",
         "bloqueada",
@@ -1486,15 +1511,16 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             column_config={
                 "Selecionar": st.column_config.CheckboxColumn("Selecionar"),
                 "demanda_id": st.column_config.TextColumn("demanda_id", disabled=True),
+                "Status": st.column_config.SelectboxColumn("Status", options=status_options, required=True),
             },
-            disabled=[col for col in fallback.columns if col not in {"Selecionar", "Observação"}],
+            disabled=[col for col in fallback.columns if col not in {"Selecionar", "Status"}],
             key="demandas_fallback_editor",
         )
         selected_ids = edited.loc[edited["Selecionar"].astype(bool), "demanda_id"].astype(str).tolist()
         return selected_ids
 
     builder = GridOptionsBuilder.from_dataframe(grid_df)
-    builder.configure_default_column(sortable=True, filter=True, resizable=True, floatingFilter=True)
+    builder.configure_default_column(sortable=True, filter=True, resizable=True, floatingFilter=True, editable=False)
     builder.configure_selection("multiple", use_checkbox=True, header_checkbox=True)
     builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
     builder.configure_grid_options(
@@ -1502,13 +1528,40 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         domLayout="normal",
         suppressRowClickSelection=True,
         tooltipShowDelay=0,
+        singleClickEdit=True,
+        stopEditingWhenCellsLoseFocus=True,
     )
-    for column in ["demanda_id", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
+    for column in ["demanda_id", "status", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
         builder.configure_column(column, hide=True)
     builder.configure_column("Empresa", minWidth=180)
     builder.configure_column("Demanda", minWidth=220)
     builder.configure_column("Responsável", minWidth=120)
-    builder.configure_column("Status", minWidth=110)
+    if JsCode is not None:
+        status_editable = JsCode(
+            """
+            function(params) {
+                if (!params.data) return false;
+                var editable = params.data.editavel === true || String(params.data.editavel).toLowerCase() === 'true';
+                var blocked = String(params.data.bloqueada) === '1';
+                return editable && !blocked;
+            }
+            """
+        )
+        builder.configure_column(
+            "Status",
+            minWidth=140,
+            editable=status_editable,
+            cellEditor="agSelectCellEditor",
+            cellEditorParams={"values": status_options},
+        )
+    else:
+        builder.configure_column(
+            "Status",
+            minWidth=140,
+            editable=True,
+            cellEditor="agSelectCellEditor",
+            cellEditorParams={"values": status_options},
+        )
     builder.configure_column("Tempo", minWidth=95)
     builder.configure_column("Dificuldade", minWidth=90)
     builder.configure_column("Observação", minWidth=220)
@@ -1535,7 +1588,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         grid_df,
         gridOptions=grid_options,
         height=520,
-        update_mode=GridUpdateMode.SELECTION_CHANGED,
+        update_mode=GridUpdateMode.VALUE_CHANGED | GridUpdateMode.SELECTION_CHANGED,
         data_return_mode=DataReturnMode.AS_INPUT,
         allow_unsafe_jscode=True,
         fit_columns_on_grid_load=True,
@@ -1543,6 +1596,37 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         theme="streamlit",
         key="demandas_aggrid",
     )
+    edited_data = response.get("data", None)
+    if isinstance(edited_data, pd.DataFrame) and not edited_data.empty:
+        changes_applied = 0
+        for _, row in edited_data.iterrows():
+            demanda_id = str(row.get("demanda_id", "")).strip()
+            if not demanda_id:
+                continue
+            original_status_internal = str(row.get("status", "")).strip().lower()
+            original_status_label = internal_to_status.get(original_status_internal, "")
+            current_status_label = str(row.get("Status", "")).strip()
+            if not current_status_label or current_status_label == original_status_label:
+                continue
+            if current_status_label not in status_to_internal:
+                continue
+            if str(row.get("bloqueada", "0")) == "1":
+                continue
+            editavel_value = str(row.get("editavel", "")).strip().lower()
+            if editavel_value not in {"true", "1", "yes"}:
+                continue
+            append_marcacao_web(
+                demanda_id,
+                current_user(),
+                "status",
+                status_to_internal[current_status_label],
+                observacao=str(row.get("observacao", "")),
+            )
+            changes_applied += 1
+        if changes_applied:
+            load_marcacoes_web.clear()
+            st.toast("✅ Status atualizado com sucesso")
+            st.rerun()
     selected_rows = response.get("selected_rows", []) or []
     return [str(row.get("demanda_id", "")) for row in selected_rows if row.get("demanda_id", "")]
 
@@ -1673,7 +1757,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                 "empresa": "Empresa",
                 "demanda_display": "Demanda",
                 "responsavel_display": "Responsável",
-                "status_visual": "Status",
+                "status_label": "Status",
                 "tempo_display": "Tempo",
                 "estrelas_visual": "Dificuldade",
                 "observacao": "Observação",
