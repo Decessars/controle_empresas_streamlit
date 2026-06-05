@@ -5,9 +5,11 @@ import csv
 import hashlib
 import hmac
 import json
+import threading
+import time
 from html import escape
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -25,6 +27,8 @@ except Exception:
     JsCode = None
     AGGRID_AVAILABLE = False
 
+FORCE_NATIVE_GRID = True
+
 
 APP_DIR = Path(__file__).resolve().parent
 DATA_WEB_DIR = APP_DIR / "data_web"
@@ -32,8 +36,61 @@ EMPRESAS_CSV = DATA_WEB_DIR / "empresas_web.csv"
 DEMANDAS_CSV = DATA_WEB_DIR / "demandas_web.csv"
 USUARIOS_CSV = DATA_WEB_DIR / "usuarios_web.csv"
 MARCACOES_CSV = DATA_WEB_DIR / "marcacoes_web.csv"
+MARCACOES_SYNC_LOG = DATA_WEB_DIR / "sync_marcacoes.log"
 METADATA_JSON = DATA_WEB_DIR / "metadata_web.json"
 LOGO_PATH = APP_DIR / "logo.png"
+SHEETS_MAX_TITLE_LEN = 100
+EMPRESAS_SHEET = "empresas_web"
+DEMANDAS_SHEET = "demandas_web"
+MARCACOES_SHEET = "marcacoes_web"
+CACHE_TTL_SECONDS = 300
+SHEETS_SYNC_INTERVAL_SECONDS = 3
+MARCACOES_FILE_LOCK = threading.Lock()
+MARCACOES_SYNC_LOCK = threading.Lock()
+MARCACOES_THREAD_LOCK = threading.Lock()
+MARCACOES_SYNC_THREAD: threading.Thread | None = None
+
+EMPRESAS_COLUMNS = [
+    "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
+    "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
+]
+DEMANDAS_COLUMNS = [
+    "demanda_id",
+    "empresa_id",
+    "empresa",
+    "cnpj",
+    "competencia",
+    "tipo_codigo",
+    "tipo_demanda",
+    "descricao",
+    "status",
+    "responsavel_operacional",
+    "estagiario_responsavel",
+    "data_limite",
+    "observacao",
+    "concluida_em",
+    "concluida_por",
+    "percentual_grupo",
+    "bloqueada",
+    "motivo_bloqueio",
+    "tempo_min",
+    "tempo_max",
+    "tempo_medio",
+    "estrelas",
+    "peso",
+    "atualizado_em",
+]
+MARCACOES_COLUMNS = [
+    "marcacao_id",
+    "demanda_id",
+    "username",
+    "acao",
+    "status_novo",
+    "observacao",
+    "justificativa",
+    "data_hora",
+    "sincronizado",
+]
 
 PASSWORD_HASHES = {
     "DMLIMA": {
@@ -93,6 +150,15 @@ def inject_professional_ui_css() -> None:
         #MainMenu,
         footer {
             display: none !important;
+        }
+        .stApp [data-testid="stCustomComponentV1"],
+        .stApp [data-testid="stCustomComponentV1"] iframe,
+        .stApp [data-testid="stElementContainer"],
+        .stApp .element-container,
+        .stApp .stale,
+        .stApp [class*="stale"] {
+            opacity: 1 !important;
+            filter: none !important;
         }
         .stApp {
             margin-top: 0 !important;
@@ -466,7 +532,7 @@ def go_back() -> None:
         st.session_state["nav_history"] = history
         navigate_to(previous, previous, push_history=False)
     else:
-        navigate_to("Home", "🏠 Home", push_history=False)
+        navigate_to("Home", "Home", push_history=False)
 
 
 def resolve_start_page() -> str:
@@ -476,8 +542,8 @@ def resolve_start_page() -> str:
     page = normalize_page(query_page or st.session_state.get("page", "Home"))
     st.session_state["page"] = page
     st.session_state["page_label"] = {
-        "Home": "🏠 Home",
-        "Empresas": "🏢 Empresas",
+        "Home": "Home",
+        "Empresas": "Empresas",
         "Demandas": "📋 Demandas",
     }.get(page, page)
     if str(query_page or "") != page:
@@ -485,18 +551,318 @@ def resolve_start_page() -> str:
     return page
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
 def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
-    empresas = pd.read_csv(EMPRESAS_CSV, dtype=str).fillna("") if EMPRESAS_CSV.exists() else pd.DataFrame()
-    demandas = pd.read_csv(DEMANDAS_CSV, dtype=str).fillna("") if DEMANDAS_CSV.exists() else pd.DataFrame()
+    empresas = load_empresas_web()
+    demandas = load_demandas_web()
     usuarios = pd.read_csv(USUARIOS_CSV, dtype=str).fillna("") if USUARIOS_CSV.exists() else pd.DataFrame()
+    metadata = load_metadata_web()
+    return empresas, demandas, usuarios, metadata
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
+def load_metadata_web() -> dict:
     metadata = {}
     if METADATA_JSON.exists():
         try:
             metadata = json.loads(METADATA_JSON.read_text(encoding="utf-8"))
         except Exception:
             metadata = {}
-    return empresas, demandas, usuarios, metadata
+    return metadata
+
+
+def usar_google_sheets() -> bool:
+    try:
+        configuracao = st.secrets.get("google_sheets", {})
+        credenciais = st.secrets.get("google_service_account", {})
+    except Exception:
+        return False
+    return bool(str(configuracao.get("spreadsheet_id", "")).strip() and credenciais)
+
+
+def obter_config_google_sheets() -> dict[str, object]:
+    try:
+        configuracao = dict(st.secrets.get("google_sheets", {}))
+        credenciais = dict(st.secrets.get("google_service_account", {}))
+    except Exception as erro:
+        raise RuntimeError("Configuracao do Google Sheets indisponivel em st.secrets.") from erro
+
+    spreadsheet_id = str(configuracao.get("spreadsheet_id", "")).strip()
+    if not spreadsheet_id:
+        raise RuntimeError("Defina google_sheets.spreadsheet_id em st.secrets.")
+    if not credenciais:
+        raise RuntimeError("Defina google_service_account em st.secrets.")
+
+    return {
+        "spreadsheet_id": spreadsheet_id,
+        "service_account": credenciais,
+        "sheet_prefix": str(configuracao.get("sheet_prefix", "")).strip(),
+    }
+
+
+def nome_aba_google(nome: str) -> str:
+    if not usar_google_sheets():
+        return nome[:SHEETS_MAX_TITLE_LEN]
+    prefixo = str(obter_config_google_sheets().get("sheet_prefix", "")).strip()
+    return f"{prefixo}{nome}"[:SHEETS_MAX_TITLE_LEN]
+
+
+@st.cache_resource(show_spinner=False)
+def cliente_google_sheets() -> object:
+    if not usar_google_sheets():
+        raise RuntimeError("Google Sheets nao configurado.")
+
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+    except ImportError as erro:
+        raise RuntimeError("Instale gspread e google-auth para usar Google Sheets.") from erro
+
+    configuracao = obter_config_google_sheets()
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    credenciais = Credentials.from_service_account_info(configuracao["service_account"], scopes=scopes)
+    return gspread.authorize(credenciais)
+
+
+@st.cache_resource(show_spinner=False)
+def planilha_google() -> object:
+    cliente = cliente_google_sheets()
+    configuracao = obter_config_google_sheets()
+    return cliente.open_by_key(str(configuracao["spreadsheet_id"]))
+
+
+def obter_worksheet_google(nome: str, columns: list[str], criar: bool = True):
+    planilha = planilha_google()
+    titulo = nome_aba_google(nome)
+    try:
+        aba = planilha.worksheet(titulo)
+    except Exception:
+        if not criar:
+            return None
+        aba = planilha.add_worksheet(title=titulo, rows=200, cols=max(2, len(columns)))
+        aba.update([columns], value_input_option="RAW")
+        return aba
+
+    valores = aba.get_all_values()
+    if criar and not valores:
+        aba.update([columns], value_input_option="RAW")
+    return aba
+
+
+def dataframe_para_linhas_google(df: pd.DataFrame, columns: list[str]) -> list[list[object]]:
+    frame = df.copy().fillna("")
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = ""
+    frame = frame[columns].copy()
+
+    linhas: list[list[object]] = [columns]
+    for _, row in frame.iterrows():
+        valores = []
+        for column in columns:
+            value = row.get(column, "")
+            if pd.isna(value):
+                value = ""
+            elif isinstance(value, (pd.Timestamp, datetime)):
+                value = value.strftime("%Y-%m-%d %H:%M:%S")
+            valores.append(value)
+        linhas.append(valores)
+    return linhas
+
+
+def linhas_google_para_dataframe(linhas: list[list[object]], columns: list[str]) -> pd.DataFrame:
+    if not linhas:
+        return pd.DataFrame(columns=columns)
+
+    cabecalho = [str(value).strip() for value in linhas[0]]
+    registros: list[dict[str, object]] = []
+    for linha in linhas[1:]:
+        if not any(str(value).strip() for value in linha):
+            continue
+        registro = {}
+        for index, column in enumerate(cabecalho):
+            if column:
+                registro[column] = linha[index] if index < len(linha) else ""
+        registros.append(registro)
+    return pd.DataFrame(registros, columns=cabecalho or columns).fillna("")
+
+
+def ler_dataframe_google(nome: str, columns: list[str], csv_fallback: Path | None = None) -> pd.DataFrame:
+    if not usar_google_sheets():
+        raise RuntimeError("Google Sheets nao configurado.")
+
+    aba = obter_worksheet_google(nome, columns, criar=True)
+    valores = aba.get_all_values()
+    if len(valores) <= 1 and csv_fallback is not None and csv_fallback.exists():
+        local_df = pd.read_csv(csv_fallback, dtype=str).fillna("")
+        salvar_dataframe_google(nome, local_df, columns)
+        return local_df
+    return linhas_google_para_dataframe(valores, columns)
+
+
+def salvar_dataframe_google(nome: str, df: pd.DataFrame, columns: list[str]) -> None:
+    aba = obter_worksheet_google(nome, columns, criar=True)
+    aba.clear()
+    aba.update(dataframe_para_linhas_google(df, columns), value_input_option="RAW")
+
+
+def append_linha_google(nome: str, row: dict[str, object], columns: list[str]) -> None:
+    aba = obter_worksheet_google(nome, columns, criar=True)
+    valores = []
+    for column in columns:
+        value = row.get(column, "")
+        if pd.isna(value):
+            value = ""
+        valores.append(value)
+    aba.append_row(valores, value_input_option="RAW")
+
+
+def _normalize_marcacoes_df(df: pd.DataFrame) -> pd.DataFrame:
+    frame = df.copy().fillna("")
+    for column in MARCACOES_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = ""
+    return frame[MARCACOES_COLUMNS].copy()
+
+
+def _read_marcacoes_local() -> pd.DataFrame:
+    if not MARCACOES_CSV.exists():
+        return pd.DataFrame(columns=MARCACOES_COLUMNS)
+    try:
+        return _normalize_marcacoes_df(pd.read_csv(MARCACOES_CSV, dtype=str).fillna(""))
+    except Exception:
+        return pd.DataFrame(columns=MARCACOES_COLUMNS)
+
+
+def _write_marcacoes_local(df: pd.DataFrame) -> None:
+    MARCACOES_CSV.parent.mkdir(parents=True, exist_ok=True)
+    _normalize_marcacoes_df(df).to_csv(MARCACOES_CSV, index=False, encoding="utf-8-sig")
+
+
+def _append_marcacao_local(row: dict[str, object]) -> None:
+    MARCACOES_CSV.parent.mkdir(parents=True, exist_ok=True)
+    exists = MARCACOES_CSV.exists()
+    with MARCACOES_FILE_LOCK:
+        with MARCACOES_CSV.open("a", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.DictWriter(fh, fieldnames=MARCACOES_COLUMNS)
+            if not exists:
+                writer.writeheader()
+            writer.writerow({column: row.get(column, "") for column in MARCACOES_COLUMNS})
+
+
+def _cliente_google_sheets_from_config(configuracao: dict[str, object]) -> object:
+    import gspread
+    from google.oauth2.service_account import Credentials
+
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    credenciais = Credentials.from_service_account_info(configuracao["service_account"], scopes=scopes)
+    return gspread.authorize(credenciais)
+
+
+def _worksheet_google_from_config(configuracao: dict[str, object], nome: str, columns: list[str]):
+    cliente = _cliente_google_sheets_from_config(configuracao)
+    planilha = cliente.open_by_key(str(configuracao["spreadsheet_id"]))
+    titulo = f"{str(configuracao.get('sheet_prefix', '')).strip()}{nome}"[:SHEETS_MAX_TITLE_LEN]
+    try:
+        aba = planilha.worksheet(titulo)
+    except Exception:
+        aba = planilha.add_worksheet(title=titulo, rows=200, cols=max(2, len(columns)))
+        aba.update([columns], value_input_option="RAW")
+    if not aba.get_all_values():
+        aba.update([columns], value_input_option="RAW")
+    return aba
+
+
+def sync_marcacoes_google_once(configuracao: dict[str, object] | None = None) -> int:
+    if not MARCACOES_SYNC_LOCK.acquire(blocking=False):
+        return 0
+    try:
+        if configuracao is None:
+            if not usar_google_sheets():
+                return 0
+            configuracao = obter_config_google_sheets()
+
+        with MARCACOES_FILE_LOCK:
+            local_df = _read_marcacoes_local()
+            if local_df.empty:
+                return 0
+            pending_mask = local_df["sincronizado"].astype(str).str.strip().ne("1")
+            pending_df = local_df.loc[pending_mask].copy()
+
+        if pending_df.empty:
+            return 0
+
+        rows_to_append: list[list[object]] = []
+        for _, row in pending_df.iterrows():
+            values = []
+            for column in MARCACOES_COLUMNS:
+                value = row.get(column, "")
+                if column == "sincronizado":
+                    value = "1"
+                values.append("" if pd.isna(value) else value)
+            rows_to_append.append(values)
+
+        aba = _worksheet_google_from_config(configuracao, MARCACOES_SHEET, MARCACOES_COLUMNS)
+        aba.append_rows(rows_to_append, value_input_option="RAW")
+
+        synced_ids = set(pending_df["marcacao_id"].astype(str))
+        with MARCACOES_FILE_LOCK:
+            refreshed = _read_marcacoes_local()
+            mask = refreshed["marcacao_id"].astype(str).isin(synced_ids)
+            refreshed.loc[mask, "sincronizado"] = "1"
+            _write_marcacoes_local(refreshed)
+        return len(rows_to_append)
+    finally:
+        MARCACOES_SYNC_LOCK.release()
+
+
+def _log_marcacoes_sync_error(erro: Exception) -> None:
+    try:
+        DATA_WEB_DIR.mkdir(parents=True, exist_ok=True)
+        with MARCACOES_SYNC_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} | {type(erro).__name__}: {erro}\n")
+    except Exception:
+        pass
+
+
+def _marcacoes_sync_worker(configuracao: dict[str, object]) -> None:
+    while True:
+        try:
+            sync_marcacoes_google_once(configuracao)
+        except Exception as erro:
+            _log_marcacoes_sync_error(erro)
+        time.sleep(SHEETS_SYNC_INTERVAL_SECONDS)
+
+
+def start_marcacoes_background_sync() -> bool:
+    global MARCACOES_SYNC_THREAD
+    if not usar_google_sheets():
+        return False
+    try:
+        configuracao = obter_config_google_sheets()
+    except Exception:
+        return False
+    with MARCACOES_THREAD_LOCK:
+        if MARCACOES_SYNC_THREAD is not None and MARCACOES_SYNC_THREAD.is_alive():
+            return True
+        MARCACOES_SYNC_THREAD = threading.Thread(
+            target=_marcacoes_sync_worker,
+            args=(configuracao,),
+            daemon=True,
+            name="marcacoes_google_sync",
+        )
+        MARCACOES_SYNC_THREAD.start()
+    return True
+
+
+def fonte_persistencia_label() -> str:
+    return "data_web + Google Sheets" if usar_google_sheets() else "data_web"
 
 
 def _normalize_empresa_text(value: object) -> str:
@@ -515,10 +881,7 @@ def _normalize_ativo(value: object) -> str:
 
 def normalize_empresas_df(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
-        return pd.DataFrame(columns=[
-            "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
-            "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
-        ])
+        return pd.DataFrame(columns=EMPRESAS_COLUMNS)
 
     frame = df.copy().fillna("")
     aliases = {
@@ -550,10 +913,7 @@ def normalize_empresas_df(df: pd.DataFrame) -> pd.DataFrame:
         normalized_columns[column] = aliases.get(key, column)
 
     frame = frame.rename(columns=normalized_columns)
-    for column in [
-        "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
-        "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
-    ]:
+    for column in EMPRESAS_COLUMNS:
         if column not in frame.columns:
             frame[column] = ""
 
@@ -569,15 +929,16 @@ def normalize_empresas_df(df: pd.DataFrame) -> pd.DataFrame:
     frame["ativo"] = frame["ativo"].map(_normalize_ativo)
     frame["atualizado_em"] = frame["atualizado_em"].map(_normalize_empresa_text)
 
-    order = [
-        "empresa_id", "cnpj", "apelido", "razao_social", "nome_fantasia",
-        "regime", "cidade", "uf", "contador_responsavel", "ativo", "atualizado_em",
-    ]
-    return frame[order].copy()
+    return frame[EMPRESAS_COLUMNS].copy()
 
 
 def load_empresas_web() -> pd.DataFrame:
     if not EMPRESAS_CSV.exists():
+        if usar_google_sheets():
+            try:
+                return normalize_empresas_df(ler_dataframe_google(EMPRESAS_SHEET, EMPRESAS_COLUMNS, EMPRESAS_CSV))
+            except Exception:
+                pass
         return normalize_empresas_df(pd.DataFrame())
     try:
         df = pd.read_csv(EMPRESAS_CSV, dtype=str).fillna("")
@@ -587,9 +948,16 @@ def load_empresas_web() -> pd.DataFrame:
 
 
 def save_empresas_web(df: pd.DataFrame) -> None:
-    EMPRESAS_CSV.parent.mkdir(parents=True, exist_ok=True)
     normalized = normalize_empresas_df(df)
+    EMPRESAS_CSV.parent.mkdir(parents=True, exist_ok=True)
     normalized.to_csv(EMPRESAS_CSV, index=False, encoding="utf-8-sig")
+    if usar_google_sheets():
+        try:
+            salvar_dataframe_google(EMPRESAS_SHEET, normalized, EMPRESAS_COLUMNS)
+        except Exception:
+            pass
+    load_data.clear()
+    load_empresas_web.clear()
 
 
 def _normalize_demanda_value(value: object) -> str:
@@ -605,33 +973,112 @@ def _normalize_demanda_flag(value: object) -> str:
     return "1" if text == "" else text
 
 
+def _parse_competencia_ym(value: object) -> tuple[int, int] | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        ano_txt, mes_txt = text.split("-", 1)
+        ano = int(ano_txt)
+        mes = int(mes_txt)
+    except Exception:
+        return None
+    if ano < 2000 or ano > 2100 or mes < 1 or mes > 12:
+        return None
+    return ano, mes
+
+
+def _nth_business_day(year: int, month: int, target: int) -> datetime | None:
+    if target <= 0:
+        return None
+    cursor = datetime(year, month, 1)
+    counted = 0
+    while cursor.month == month:
+        if cursor.weekday() < 5:
+            counted += 1
+            if counted == target:
+                return cursor
+        cursor += timedelta(days=1)
+    return None
+
+
+def _next_business_day(value: datetime) -> datetime:
+    cursor = value
+    while cursor.weekday() >= 5:
+        cursor += timedelta(days=1)
+    return cursor
+
+
+def _format_date_display(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    raw = text[:10]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(raw, fmt).strftime("%d/%m/%Y")
+        except Exception:
+            continue
+    return text
+
+
+def _demand_deadline(tipo_codigo: object, competencia: object) -> str:
+    comp = _parse_competencia_ym(competencia)
+    if not comp:
+        return ""
+    ano, mes = comp
+    tipo = str(tipo_codigo or "").strip().upper()
+
+    def business_day(n: int) -> str:
+        value = _nth_business_day(ano, mes, n)
+        return value.strftime("%Y-%m-%d") if value else ""
+
+    def calendar_day(day: int) -> str:
+        try:
+            value = datetime(ano, mes, day)
+        except Exception:
+            return ""
+        return value.strftime("%Y-%m-%d")
+
+    if tipo in {"EXEC_FOLHA", "ENV_CONTRACHEQUES"}:
+        return business_day(1)
+    if tipo == "GUIA_INSS":
+        return business_day(2)
+    if tipo in {"GUIA_FGTS", "GUIA_FGTS_PARC"}:
+        return business_day(3)
+    if tipo == "PEDIR_INFOS":
+        return business_day(4)
+    if tipo == "APUR_ISS":
+        return calendar_day(5)
+    if tipo == "APUR_SIMPLES":
+        return business_day(5)
+    if tipo == "GUIA_MEI":
+        return business_day(6)
+    if tipo == "ENV_PARC_SIMPLES":
+        return calendar_day(10)
+    if tipo == "GUIA_PREF":
+        return business_day(7)
+    if tipo == "REL_DEBITOS":
+        try:
+            value = datetime(ano, mes, 11)
+        except Exception:
+            return ""
+        if value.weekday() < 5:
+            return value.strftime("%Y-%m-%d")
+        return _next_business_day(value).strftime("%Y-%m-%d")
+    if tipo == "CONS_ICMS_ST":
+        return business_day(4)
+    if tipo == "PUXAR_NF_SAIDA":
+        return business_day(5)
+    if tipo == "COBRAR_HONORARIOS":
+        return calendar_day(25)
+    if tipo in {"PARC_MENSAL", "PARC_IMPOSTOS"}:
+        return business_day(7)
+    return ""
+
+
 def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = None) -> pd.DataFrame:
-    columns = [
-        "demanda_id",
-        "empresa_id",
-        "empresa",
-        "cnpj",
-        "competencia",
-        "tipo_codigo",
-        "tipo_demanda",
-        "descricao",
-        "status",
-        "responsavel_operacional",
-        "estagiario_responsavel",
-        "data_limite",
-        "observacao",
-        "concluida_em",
-        "concluida_por",
-        "percentual_grupo",
-        "bloqueada",
-        "motivo_bloqueio",
-        "tempo_min",
-        "tempo_max",
-        "tempo_medio",
-        "estrelas",
-        "peso",
-        "atualizado_em",
-    ]
+    columns = DEMANDAS_COLUMNS
     if df.empty:
         return pd.DataFrame(columns=columns)
 
@@ -694,7 +1141,7 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
     else:
         stars = (percentual_numeric.fillna(0) / 20).round().astype(int).clip(0, 5)
     frame["estrelas"] = stars.astype(str)
-    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "⭐" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
 
     def _tempo_display(row: pd.Series) -> str:
         tempo_medio = str(row.get("tempo_medio", "")).strip()
@@ -734,6 +1181,9 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
         }
     ).fillna(frame["status"].astype(str))
     frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
+    if "data_limite" in frame.columns:
+        fallback = frame.apply(lambda row: _demand_deadline(row.get("tipo_codigo", ""), row.get("competencia", "")), axis=1)
+        frame["data_limite"] = frame["data_limite"].where(frame["data_limite"].astype(str).str.strip().ne(""), fallback)
     return frame[[
         "demanda_id",
         "empresa_id",
@@ -768,41 +1218,38 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
     ]].copy()
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
 def load_demandas_web() -> pd.DataFrame:
-    if not DEMANDAS_CSV.exists():
-        return normalize_demandas_web(pd.DataFrame())
-    try:
-        df = pd.read_csv(DEMANDAS_CSV, dtype=str).fillna("")
-    except Exception:
-        return normalize_demandas_web(pd.DataFrame())
-    empresas = load_empresas_web()
-    return normalize_demandas_web(df, empresas)
+    if DEMANDAS_CSV.exists():
+        try:
+            df = pd.read_csv(DEMANDAS_CSV, dtype=str).fillna("")
+            empresas = load_empresas_web()
+            return normalize_demandas_web(df, empresas)
+        except Exception:
+            return normalize_demandas_web(pd.DataFrame())
+    if usar_google_sheets():
+        try:
+            df = ler_dataframe_google(DEMANDAS_SHEET, DEMANDAS_COLUMNS, DEMANDAS_CSV)
+            empresas = load_empresas_web()
+            return normalize_demandas_web(df, empresas)
+        except Exception:
+            pass
+    return normalize_demandas_web(pd.DataFrame())
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=CACHE_TTL_SECONDS)
 def load_marcacoes_web() -> pd.DataFrame:
-    columns = [
-        "marcacao_id",
-        "demanda_id",
-        "username",
-        "acao",
-        "status_novo",
-        "observacao",
-        "justificativa",
-        "data_hora",
-        "sincronizado",
-    ]
-    if not MARCACOES_CSV.exists():
-        return pd.DataFrame(columns=columns)
-    try:
-        df = pd.read_csv(MARCACOES_CSV, dtype=str).fillna("")
-    except Exception:
-        return pd.DataFrame(columns=columns)
-    for column in columns:
-        if column not in df.columns:
-            df[column] = ""
-    return df[columns].copy()
+    columns = MARCACOES_COLUMNS
+    if MARCACOES_CSV.exists():
+        return _read_marcacoes_local()
+    if usar_google_sheets():
+        try:
+            df = _normalize_marcacoes_df(ler_dataframe_google(MARCACOES_SHEET, columns, MARCACOES_CSV))
+            _write_marcacoes_local(df)
+            return df
+        except Exception:
+            pass
+    return pd.DataFrame(columns=columns)
 
 
 def append_marcacao_web(
@@ -813,28 +1260,21 @@ def append_marcacao_web(
     observacao: str | None = None,
     justificativa: str | None = None,
 ) -> None:
-    MARCACOES_CSV.parent.mkdir(parents=True, exist_ok=True)
-    exists = MARCACOES_CSV.exists()
-    with MARCACOES_CSV.open("a", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(
-            fh,
-            fieldnames=["marcacao_id", "demanda_id", "username", "acao", "status_novo", "observacao", "justificativa", "data_hora", "sincronizado"],
-        )
-        if not exists:
-            writer.writeheader()
-        writer.writerow(
-            {
-                "marcacao_id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-                "demanda_id": str(demanda_id),
-                "username": normalize_user(username),
-                "acao": str(acao),
-                "status_novo": str(status_novo),
-                "observacao": str(observacao or ""),
-                "justificativa": str(justificativa or ""),
-                "data_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "sincronizado": "0",
-            }
-        )
+    row = {
+        "marcacao_id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
+        "demanda_id": str(demanda_id),
+        "username": normalize_user(username),
+        "acao": str(acao),
+        "status_novo": str(status_novo),
+        "observacao": str(observacao or ""),
+        "justificativa": str(justificativa or ""),
+        "data_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "sincronizado": "0",
+    }
+    _append_marcacao_local(row)
+    if usar_google_sheets():
+        start_marcacoes_background_sync()
+    load_data.clear()
     load_marcacoes_web.clear()
 
 
@@ -923,7 +1363,7 @@ def apply_marcacoes_to_view(df_demandas: pd.DataFrame, df_marcacoes: pd.DataFram
         frame["responsavel_operacional"].astype(str).str.strip().ne(""),
         frame["estagiario_responsavel"],
     )
-    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "⭐" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
     return frame
 
 
@@ -977,7 +1417,7 @@ def login_screen() -> None:
                 st.session_state["usuario"] = normalize_user(username)
                 st.session_state["nav_history"] = []
                 st.session_state["page"] = "Home"
-                st.session_state["page_label"] = "🏠 Home"
+                st.session_state["page_label"] = "Home"
                 st.query_params["page"] = "Home"
                 st.rerun()
             else:
@@ -992,10 +1432,10 @@ def sidebar(metadata: dict) -> str:
         st.caption(current_profile_label())
         st.divider()
         st.markdown("**Navegacao**")
-        if st.button("🏠 Home", use_container_width=True):
-            navigate_to("Home", "🏠 Home")
-        if st.button("🏢 Empresas", use_container_width=True):
-            navigate_to("Empresas", "🏢 Empresas")
+        if st.button("Home", use_container_width=True):
+            navigate_to("Home", "Home")
+        if st.button("Empresas", use_container_width=True):
+            navigate_to("Empresas", "Empresas")
         if st.button("📋 Demandas", use_container_width=True):
             navigate_to("Demandas", "📋 Demandas")
         competencia = str(metadata.get("competencia_atual") or "2026-05")
@@ -1017,7 +1457,7 @@ def header(title: str, subtitle: str = "") -> None:
 
 
 def render_topbar(competencia: str) -> None:
-    page_label = st.session_state.get("page_label", "🏠 Home")
+    page_label = st.session_state.get("page_label", "Home")
     c1, c2, c3, c4, c5 = st.columns([2.1, 1.0, 1.0, 0.55, 0.45], vertical_alignment="center")
     with c1:
         if LOGO_PATH.exists():
@@ -1038,8 +1478,8 @@ def render_topbar(competencia: str) -> None:
     with c3:
         st.markdown(f"<span class='status-badge'>Perfil: {escape(current_profile_label())}</span>", unsafe_allow_html=True)
     with c4:
-        if st.button("🏠 Home", key="topbar_home", use_container_width=True):
-            navigate_to("Home", "🏠 Home")
+        if st.button("Home", key="topbar_home", use_container_width=True):
+            navigate_to("Home", "Home")
     with c5:
         if st.button("Sair", key="topbar_logout", use_container_width=True):
             st.session_state.clear()
@@ -1072,7 +1512,7 @@ def render_home() -> None:
             <div class="metric-card">
                 <div class="label">Total de demandas</div>
                 <span class="value">{total}</span>
-                <div class="hint">Base carregada em data_web</div>
+                <div class="hint">Base carregada em {escape(fonte_persistencia_label())}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1140,8 +1580,8 @@ def render_home() -> None:
             """,
             unsafe_allow_html=True,
         )
-        if st.button("🏢 Abrir Empresas", key="home_empresas"):
-            navigate_to("Empresas", "🏢 Empresas")
+        if st.button("Abrir Empresas", key="home_empresas"):
+            navigate_to("Empresas", "Empresas")
 
 
 def sort_controls(df: pd.DataFrame, columns: list[str], key_prefix: str) -> pd.DataFrame:
@@ -1212,7 +1652,7 @@ def _selected_empresa_frame(empresas: pd.DataFrame, selected_id: str) -> pd.Data
 
 
 def render_empresas(empresas: pd.DataFrame) -> None:
-    header("🏢 Controle de Empresas", "Consulta rápida dos clientes exportados pelo sistema principal.")
+    header("Controle de Empresas", "Consulta rápida dos clientes exportados pelo sistema principal.")
 
     empresas_df = load_empresas_web()
     if empresas_df.empty:
@@ -1376,27 +1816,7 @@ def can_mark(row: pd.Series) -> bool:
 
 
 def append_marcacao(demanda_id: str, status: str, observacao: str) -> None:
-    MARCACOES_CSV.parent.mkdir(parents=True, exist_ok=True)
-    exists = MARCACOES_CSV.exists()
-    with MARCACOES_CSV.open("a", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(
-            fh,
-            fieldnames=["marcacao_id", "demanda_id", "username", "acao", "status_novo", "observacao", "data_hora", "sincronizado"],
-        )
-        if not exists:
-            writer.writeheader()
-        writer.writerow(
-            {
-                "marcacao_id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
-                "demanda_id": demanda_id,
-                "username": current_user(),
-                "acao": "status",
-                "status_novo": status,
-                "observacao": observacao,
-                "data_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "sincronizado": "0",
-            }
-        )
+    append_marcacao_web(demanda_id, current_user(), "status", status, observacao=observacao)
 
 
 def metric_row(total: int, pendentes: int, concluidas: int) -> None:
@@ -1550,6 +1970,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     hidden_order = [
         "demanda_id",
         "status",
+        "data_limite",
         "minha_demanda",
         "editavel",
         "bloqueada",
@@ -1557,6 +1978,8 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         "estagiario_responsavel",
     ]
     grid_df = df[visible_order + hidden_order].copy()
+    if "data_limite" in grid_df.columns:
+        grid_df.insert(4, "Data limite", grid_df["data_limite"].map(_format_date_display))
     if not grid_df.empty and "Demanda" in grid_df.columns:
         demanda_ordem = pd.to_numeric(
             grid_df["Demanda"].astype(str).str.extract(r"^\s*(\d+)")[0],
@@ -1567,24 +1990,58 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             .sort_values(["_demanda_ordem", "_demanda_texto", "Empresa"], kind="mergesort")
             .drop(columns=["_demanda_ordem", "_demanda_texto"])
         )
-    if not AGGRID_AVAILABLE:
-        st.info("AgGrid indisponível. Usando fallback em tabela editável.")
-        fallback = grid_df.copy()
+    if FORCE_NATIVE_GRID or not AGGRID_AVAILABLE:
+        fallback_columns = [col for col in grid_df.columns if col not in hidden_order and col != "data_limite"]
+        fallback = grid_df[fallback_columns].copy()
         fallback.insert(0, "Selecionar", False)
         edited = st.data_editor(
             fallback,
             hide_index=True,
             use_container_width=True,
-            height=500,
+            height=760,
             column_config={
                 "Selecionar": st.column_config.CheckboxColumn("Selecionar"),
-                "demanda_id": st.column_config.TextColumn("demanda_id", disabled=True),
                 "Status": st.column_config.SelectboxColumn("Status", options=status_options, required=True),
             },
             disabled=[col for col in fallback.columns if col not in {"Selecionar", "Status"}],
             key="demandas_fallback_editor",
         )
-        selected_ids = edited.loc[edited["Selecionar"].astype(bool), "demanda_id"].astype(str).tolist()
+        status_baseline = st.session_state.setdefault("demandas_status_baseline", {})
+        changes_applied = 0
+        for row_index, row in edited.iterrows():
+            if row_index not in grid_df.index:
+                continue
+            source_row = grid_df.loc[row_index]
+            demanda_id = str(source_row.get("demanda_id", "")).strip()
+            if not demanda_id:
+                continue
+            current_status_label = str(row.get("Status", "")).strip()
+            if current_status_label not in status_to_internal:
+                continue
+            current_status_internal = status_to_internal[current_status_label]
+            original_status_internal = str(source_row.get("status", "")).strip().lower()
+            baseline_status = str(status_baseline.get(demanda_id, original_status_internal)).strip().lower()
+            if current_status_internal == baseline_status:
+                continue
+            if str(source_row.get("bloqueada", "0")) == "1":
+                continue
+            editavel_value = str(source_row.get("editavel", "")).strip().lower()
+            if editavel_value not in {"true", "1", "yes"}:
+                continue
+            append_marcacao_web(
+                demanda_id,
+                current_user(),
+                "status",
+                current_status_internal,
+                observacao=str(row.get("Observacao", row.get("Observação", ""))),
+            )
+            status_baseline[demanda_id] = current_status_internal
+            changes_applied += 1
+        if changes_applied:
+            st.session_state["demandas_status_baseline"] = status_baseline
+            st.toast("Status salvo em segundo plano")
+        selected_index = edited.index[edited["Selecionar"].astype(bool)]
+        selected_ids = grid_df.loc[selected_index, "demanda_id"].astype(str).tolist()
         return selected_ids
 
     builder = GridOptionsBuilder.from_dataframe(grid_df)
@@ -1599,7 +2056,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         singleClickEdit=True,
         stopEditingWhenCellsLoseFocus=True,
     )
-    for column in ["demanda_id", "status", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
+    for column in ["demanda_id", "status", "data_limite", "minha_demanda", "editavel", "bloqueada", "responsavel_operacional", "estagiario_responsavel"]:
         builder.configure_column(column, hide=True)
     builder.configure_column("Empresa", minWidth=180)
     builder.configure_column("Demanda", minWidth=220, sortable=True, sort="asc")
@@ -1692,6 +2149,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             cellEditorParams={"values": status_options},
             cellStyle=status_cell_style,
         )
+    builder.configure_column("Data limite", minWidth=120)
     builder.configure_column("Tempo", minWidth=95)
     builder.configure_column("Dificuldade", minWidth=90)
     builder.configure_column("Observação", minWidth=220)
@@ -1729,16 +2187,20 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     edited_data = response.get("data", None)
     if isinstance(edited_data, pd.DataFrame) and not edited_data.empty:
         changes_applied = 0
+        status_baseline = st.session_state.setdefault("demandas_status_baseline", {})
         for _, row in edited_data.iterrows():
             demanda_id = str(row.get("demanda_id", "")).strip()
             if not demanda_id:
                 continue
             original_status_internal = str(row.get("status", "")).strip().lower()
-            original_status_label = internal_to_status.get(original_status_internal, "")
             current_status_label = str(row.get("Status", "")).strip()
-            if not current_status_label or current_status_label == original_status_label:
+            if not current_status_label:
                 continue
             if current_status_label not in status_to_internal:
+                continue
+            current_status_internal = status_to_internal[current_status_label]
+            baseline_status = str(status_baseline.get(demanda_id, original_status_internal)).strip().lower()
+            if current_status_internal == baseline_status:
                 continue
             if str(row.get("bloqueada", "0")) == "1":
                 continue
@@ -1749,15 +2211,22 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
                 demanda_id,
                 current_user(),
                 "status",
-                status_to_internal[current_status_label],
+                current_status_internal,
                 observacao=str(row.get("observacao", "")),
             )
+            status_baseline[demanda_id] = current_status_internal
             changes_applied += 1
         if changes_applied:
+            st.session_state["demandas_status_baseline"] = status_baseline
             load_marcacoes_web.clear()
             st.toast("✅ Status atualizado com sucesso")
-            st.rerun()
-    selected_rows = response.get("selected_rows", []) or []
+    selected_rows = response.get("selected_rows", [])
+    if isinstance(selected_rows, pd.DataFrame):
+        if selected_rows.empty or "demanda_id" not in selected_rows.columns:
+            return []
+        return selected_rows["demanda_id"].astype(str).tolist()
+    if not selected_rows:
+        return []
     return [str(row.get("demanda_id", "")) for row in selected_rows if row.get("demanda_id", "")]
 
 
@@ -1786,6 +2255,7 @@ def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> 
             <div><strong>Tipo:</strong> {escape(str(row.get("Demanda", row.get("tipo_demanda", ""))))}</div>
             <div><strong>Responsável:</strong> {escape(str(row.get("Responsável", row.get("responsavel_display", ""))))}</div>
             <div><strong>Status:</strong> {escape(str(row.get("Status", row.get("status_visual", ""))))}</div>
+            <div><strong>Data limite:</strong> {escape(_format_date_display(row.get("Data limite", row.get("data_limite", ""))))}</div>
             <div><strong>Tempo:</strong> {escape(str(row.get("Tempo", row.get("tempo_display", ""))))}</div>
             <div><strong>Estrelas:</strong> {escape(str(row.get("Dificuldade", row.get("estrelas_visual", ""))))}</div>
             <div><strong>Observação:</strong> {escape(str(row.get("Observação", row.get("observacao", ""))))}</div>
@@ -1801,7 +2271,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
     username = current_user()
     role = current_profile()
-    base_demandas = load_demandas_web()
+    base_demandas = demandas if not demandas.empty else load_demandas_web()
     view = build_demandas_view(base_demandas, username, role, empresas)
     if view.empty:
         st.info("Nenhuma demanda encontrada.")
@@ -1948,7 +2418,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                 st.warning("Algumas demandas estão bloqueadas.")
             if applied:
                 st.rerun()
-    if action_right.button("📝 Salvar observações", use_container_width=True):
+    if action_right.button("Salvar observacoes", use_container_width=True):
         if not selected_ids:
             st.warning("Selecione ao menos uma demanda na tabela.")
         elif not observation_text.strip():
@@ -1956,7 +2426,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
         else:
             applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "observacao", observacao=observation_text)
             if applied:
-                st.toast("📝 Observações aplicadas com sucesso")
+                st.toast("Observacoes aplicadas com sucesso")
             if denied:
                 st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
             if blocked:
@@ -1969,8 +2439,8 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
 
 ACTIVE_PAGES = {
-    "Home": {"label": "🏠 Home", "renderer": render_home},
-    "Empresas": {"label": "🏢 Empresas", "renderer": render_empresas},
+    "Home": {"label": "Home", "renderer": render_home},
+    "Empresas": {"label": "Empresas", "renderer": render_empresas},
     "Demandas": {"label": "📋 Demandas", "renderer": render_demandas},
 }
 
@@ -1981,7 +2451,8 @@ def main() -> None:
         login_screen()
         return
 
-    empresas, demandas, _usuarios, metadata = load_data()
+    start_marcacoes_background_sync()
+    metadata = load_metadata_web()
     competencia = sidebar(metadata)
     page = resolve_start_page()
     render_topbar(competencia)
@@ -1989,10 +2460,14 @@ def main() -> None:
     if page == "Home":
         renderer()
     elif page == "Empresas":
+        empresas = load_empresas_web()
         renderer(empresas)
     elif page == "Demandas":
+        empresas = load_empresas_web()
+        demandas = load_demandas_web()
         renderer(empresas, demandas, competencia)
 
 
 if __name__ == "__main__":
     main()
+
