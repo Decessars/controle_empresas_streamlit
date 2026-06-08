@@ -2445,8 +2445,10 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
     if "demandas_only_mine" not in st.session_state:
         st.session_state["demandas_only_mine"] = False
+    if "demandas_show_all" not in st.session_state:
+        st.session_state["demandas_show_all"] = False
     if "demandas_hide_concluidas" not in st.session_state:
-        st.session_state["demandas_hide_concluidas"] = False
+        st.session_state["demandas_hide_concluidas"] = True
     if "demandas_status_filter" not in st.session_state:
         st.session_state["demandas_status_filter"] = "Todos"
 
@@ -2477,9 +2479,13 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
     if filter_cols[5].button("🎯 Minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
         st.session_state["demandas_only_mine"] = True
+        st.session_state["demandas_show_all"] = False
+        st.session_state["demandas_hide_concluidas"] = True
         st.rerun()
-    if filter_cols[6].button("👥 Todas", use_container_width=True, type="primary" if not st.session_state.get("demandas_only_mine") else "secondary"):
+    if filter_cols[6].button("👥 Todos", use_container_width=True, type="primary" if st.session_state.get("demandas_show_all") else "secondary"):
         st.session_state["demandas_only_mine"] = False
+        st.session_state["demandas_show_all"] = True
+        st.session_state["demandas_hide_concluidas"] = False
         st.rerun()
     hide_concluidas = st.session_state.get("demandas_hide_concluidas", False)
     if filter_cols[7].button(
@@ -2487,7 +2493,9 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
         use_container_width=True,
         type="primary" if hide_concluidas else "secondary",
     ):
-        st.session_state["demandas_hide_concluidas"] = not hide_concluidas
+        new_hide = not hide_concluidas
+        st.session_state["demandas_hide_concluidas"] = new_hide
+        st.session_state["demandas_show_all"] = not new_hide
         st.rerun()
     if filter_cols[8].button("🔄 Atualizar", use_container_width=True):
         load_demandas_web.clear()
