@@ -361,9 +361,9 @@ def inject_professional_ui_css() -> None:
         }
         .dashboard-panel__footer {
             margin-top: 0.95rem;
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr auto;
             align-items: center;
-            justify-content: space-between;
             gap: 10px;
         }
         .dashboard-panel__hint {
@@ -1703,7 +1703,7 @@ def render_home() -> None:
             """,
             unsafe_allow_html=True,
         )
-        if st.button("📋 Abrir Demandas", key="home_demandas", type="primary", use_container_width=True):
+        if st.button("📋 Acessar Demandas", key="home_demandas", type="primary", use_container_width=True):
             navigate_to("Demandas", "📋 Demandas")
     with d2:
         st.markdown(
@@ -1729,7 +1729,7 @@ def render_home() -> None:
             """,
             unsafe_allow_html=True,
         )
-        if st.button("🏢 Abrir Empresas", key="home_empresas", use_container_width=True):
+        if st.button("🏢 Acessar Empresas", key="home_empresas", use_container_width=True):
             navigate_to("Empresas", "Empresas")
 
 
