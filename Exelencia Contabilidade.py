@@ -2109,8 +2109,6 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         "Demanda",
         "Responsável",
         "Status",
-        "Tempo",
-        "Dificuldade",
         "Observação",
         "Concluída em",
         "Concluída por",
@@ -2310,8 +2308,6 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             cellStyle=status_cell_style,
         )
     builder.configure_column("Data limite", minWidth=120)
-    builder.configure_column("Tempo", minWidth=95)
-    builder.configure_column("Dificuldade", minWidth=90)
     builder.configure_column("Observação", minWidth=220)
     builder.configure_column("Concluída em", minWidth=145)
     builder.configure_column("Concluída por", minWidth=130)
@@ -2422,8 +2418,6 @@ def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> 
             <div><strong>Responsável:</strong> {escape(str(row.get("Responsável", row.get("responsavel_display", ""))))}</div>
             <div><strong>Status:</strong> {escape(str(row.get("Status", row.get("status_visual", ""))))}</div>
             <div><strong>Data limite:</strong> {escape(_format_date_display(row.get("Data limite", row.get("data_limite", ""))))}</div>
-            <div><strong>Tempo:</strong> {escape(str(row.get("Tempo", row.get("tempo_display", ""))))}</div>
-            <div><strong>Estrelas:</strong> {escape(str(row.get("Dificuldade", row.get("estrelas_visual", ""))))}</div>
             <div><strong>Observação:</strong> {escape(str(row.get("Observação", row.get("observacao", ""))))}</div>
             <div><strong>Bloqueio:</strong> {escape(str(row.get("Bloqueio", row.get("bloqueio_display", ""))))}</div>
         </div>
@@ -2538,8 +2532,6 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                 "demanda_display": "Demanda",
                 "responsavel_display": "Responsável",
                 "status_label": "Status",
-                "tempo_display": "Tempo",
-                "estrelas_visual": "Dificuldade",
                 "observacao": "Observação",
                 "concluida_em": "Concluída em",
                 "concluida_por": "Concluída por",
