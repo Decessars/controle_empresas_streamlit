@@ -259,6 +259,117 @@ def inject_professional_ui_css() -> None:
             padding: 1rem;
             min-height: 168px;
         }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .dashboard-panel {
+            position: relative;
+            overflow: hidden;
+            min-height: 240px;
+            padding: 1.05rem 1.1rem 1rem;
+            border-radius: 22px;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.76));
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+        }
+        .dashboard-panel::after {
+            content: "";
+            position: absolute;
+            right: -60px;
+            bottom: -72px;
+            width: 190px;
+            height: 190px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 70%);
+            pointer-events: none;
+        }
+        .dashboard-panel--demandas {
+            background:
+                radial-gradient(circle at top left, rgba(47, 111, 237, 0.20), transparent 28%),
+                linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(235, 243, 255, 0.92));
+        }
+        .dashboard-panel--empresas {
+            background:
+                radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 28%),
+                linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(236, 253, 245, 0.92));
+        }
+        .dashboard-panel__top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 0.55rem;
+        }
+        .dashboard-panel__icon {
+            font-size: 1.55rem;
+            line-height: 1;
+        }
+        .dashboard-panel__kicker {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.32rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--ink);
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+        }
+        .dashboard-panel__title {
+            font-size: 1.18rem;
+            font-weight: 900;
+            color: var(--ink);
+            margin-bottom: 0.24rem;
+        }
+        .dashboard-panel__desc {
+            color: var(--muted);
+            font-size: 0.93rem;
+            line-height: 1.35;
+            max-width: 42ch;
+        }
+        .dashboard-panel__stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 0.9rem;
+        }
+        .dashboard-panel__stat {
+            padding: 0.7rem 0.78rem;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.84);
+            border: 1px solid rgba(148, 163, 184, 0.20);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+        }
+        .dashboard-panel__stat span {
+            display: block;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+        }
+        .dashboard-panel__stat strong {
+            display: block;
+            margin-top: 0.18rem;
+            font-size: 1.25rem;
+            font-weight: 900;
+            color: var(--ink);
+            line-height: 1;
+        }
+        .dashboard-panel__footer {
+            margin-top: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .dashboard-panel__hint {
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
         .metric-card {
             padding: 0.9rem 1rem;
             min-height: 92px;
@@ -1550,36 +1661,75 @@ def render_home() -> None:
             unsafe_allow_html=True,
         )
 
-    st.markdown('<div class="section-title" style="margin-top:0.35rem;">Acesso rápido</div>', unsafe_allow_html=True)
-    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Escolha uma área ativa do painel.</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
+    empresas_total = int(len(empresas)) if empresas is not None else 0
+    if empresas is not None and not empresas.empty:
+        if "ativo" in empresas.columns:
+            empresas_ativas = int(empresas["ativo"].astype(str).eq("1").sum())
+        elif "is_ativo" in empresas.columns:
+            empresas_ativas = int(empresas["is_ativo"].astype(str).eq("1").sum())
+        else:
+            empresas_ativas = empresas_total
+        empresas_inativas = max(empresas_total - empresas_ativas, 0)
+        regimes_distintos = int(empresas["regime"].astype(str).replace("", pd.NA).dropna().nunique())
+    else:
+        empresas_ativas = 0
+        empresas_inativas = 0
+        regimes_distintos = 0
+
+    st.markdown('<div class="section-title" style="margin-top:0.35rem;">Dashboards principais</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Dois painéis diretos para entrar no fluxo operacional.</div>', unsafe_allow_html=True)
+    d1, d2 = st.columns(2, gap="large")
+    with d1:
         st.markdown(
-            """
-            <div class="module-card">
-                <div class="icon">📋</div>
-                <div class="title">Controle de Demandas</div>
-                <div class="desc">Acompanhe pendências, status e andamento operacional da competência atual.</div>
-                <div class="status-badge">Operação diária</div>
+            f"""
+            <div class="dashboard-panel dashboard-panel--demandas">
+                <div class="dashboard-panel__top">
+                    <div class="dashboard-panel__icon">📋</div>
+                    <div class="dashboard-panel__kicker">Operação diária</div>
+                </div>
+                <div class="dashboard-panel__title">Controle de Demandas</div>
+                <div class="dashboard-panel__desc">Veja pendências, concluídas e a distribuição da competência em um painel mais direto.</div>
+                <div class="dashboard-panel__stats">
+                    <div class="dashboard-panel__stat"><span>Total</span><strong>{total}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Pendentes</span><strong>{pendentes}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Concluídas</span><strong>{concluidas}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Progresso</span><strong>{progresso:.0f}%</strong></div>
+                </div>
+                <div class="dashboard-panel__footer">
+                    <div class="dashboard-panel__hint">Acesso rápido ao painel de trabalho.</div>
+                    <div class="status-badge">Fluxo operacional</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.button("📋 Abrir Demandas", key="home_demandas", type="primary"):
+        if st.button("📋 Abrir Demandas", key="home_demandas", type="primary", use_container_width=True):
             navigate_to("Demandas", "📋 Demandas")
-    with c2:
+    with d2:
         st.markdown(
-            """
-            <div class="module-card">
-                <div class="icon">🏢</div>
-                <div class="title">Controle de Empresas</div>
-                <div class="desc">Visualize a base de clientes e faça consultas rápidas sem excesso de telas.</div>
-                <div class="status-badge">Base operacional</div>
+            f"""
+            <div class="dashboard-panel dashboard-panel--empresas">
+                <div class="dashboard-panel__top">
+                    <div class="dashboard-panel__icon">🏢</div>
+                    <div class="dashboard-panel__kicker">Base operacional</div>
+                </div>
+                <div class="dashboard-panel__title">Controle de Empresas</div>
+                <div class="dashboard-panel__desc">Consulte clientes, ativos e filtros cadastrais em uma visão mais limpa e objetiva.</div>
+                <div class="dashboard-panel__stats">
+                    <div class="dashboard-panel__stat"><span>Total</span><strong>{empresas_total}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Ativas</span><strong>{empresas_ativas}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Inativas</span><strong>{empresas_inativas}</strong></div>
+                    <div class="dashboard-panel__stat"><span>Regimes</span><strong>{regimes_distintos}</strong></div>
+                </div>
+                <div class="dashboard-panel__footer">
+                    <div class="dashboard-panel__hint">Acesso rápido à base de clientes.</div>
+                    <div class="status-badge">Consulta cadastral</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.button("Abrir Empresas", key="home_empresas"):
+        if st.button("🏢 Abrir Empresas", key="home_empresas", use_container_width=True):
             navigate_to("Empresas", "Empresas")
 
 
