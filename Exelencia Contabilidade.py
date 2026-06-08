@@ -27,7 +27,8 @@ except Exception:
     JsCode = None
     AGGRID_AVAILABLE = False
 
-FORCE_NATIVE_GRID = True
+# Keep AgGrid enabled here so status can be color-coded per cell.
+FORCE_NATIVE_GRID = False
 
 
 APP_DIR = Path(__file__).resolve().parent
@@ -1460,8 +1461,6 @@ def render_topbar(competencia: str) -> None:
     page_label = st.session_state.get("page_label", "Home")
     c1, c2, c3, c4, c5 = st.columns([2.1, 1.0, 1.0, 0.55, 0.45], vertical_alignment="center")
     with c1:
-        if LOGO_PATH.exists():
-            st.image(str(LOGO_PATH), width=34)
         st.markdown(
             f"""
             <div class="topbar-brand">
@@ -2289,22 +2288,31 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     empresa_options = ["Todas"] + sorted([v for v in view["empresa"].astype(str).unique().tolist() if v.strip()])
     tipo_options = ["Todos"] + sorted([v for v in view["tipo_demanda"].astype(str).unique().tolist() if v.strip()])
 
-    f1, f2, f3, f4, f5 = st.columns([1.05, 1.1, 1.15, 1.15, 1.55], vertical_alignment="bottom")
-    competencia = f1.selectbox("Competência", competencias_options or [competence_default], index=(competencias_options.index(competence_default) if competence_default in competencias_options else 0), key="demandas_competencia")
-    status = f2.selectbox("Status", status_options, index=status_options.index(st.session_state.get("demandas_status_filter", "Todos")) if st.session_state.get("demandas_status_filter", "Todos") in status_options else 0, key="demandas_status")
+    filter_cols = st.columns([1.0, 1.02, 1.08, 1.08, 1.35, 0.75, 0.72, 0.85], vertical_alignment="bottom")
+    competencia = filter_cols[0].selectbox(
+        "Competência",
+        competencias_options or [competence_default],
+        index=(competencias_options.index(competence_default) if competence_default in competencias_options else 0),
+        key="demandas_competencia",
+    )
+    status = filter_cols[1].selectbox(
+        "Status",
+        status_options,
+        index=status_options.index(st.session_state.get("demandas_status_filter", "Todos")) if st.session_state.get("demandas_status_filter", "Todos") in status_options else 0,
+        key="demandas_status",
+    )
     st.session_state["demandas_status_filter"] = status
-    responsavel = f3.selectbox("Responsável / Estagiário", responsavel_options, key="demandas_responsavel")
-    empresa = f4.selectbox("Empresa", empresa_options, key="demandas_empresa")
-    tipo = f5.selectbox("Tipo de demanda", tipo_options, key="demandas_tipo")
+    responsavel = filter_cols[2].selectbox("Responsável / Estagiário", responsavel_options, key="demandas_responsavel")
+    empresa = filter_cols[3].selectbox("Empresa", empresa_options, key="demandas_empresa")
+    tipo = filter_cols[4].selectbox("Tipo de demanda", tipo_options, key="demandas_tipo")
 
-    toggle_col1, toggle_col2, action_col = st.columns([0.9, 0.9, 2.4], vertical_alignment="center")
-    if toggle_col1.button("🎯 Só minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
+    if filter_cols[5].button("🎯 Só minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
         st.session_state["demandas_only_mine"] = True
         st.rerun()
-    if toggle_col2.button("👥 Todas", use_container_width=True, type="primary" if not st.session_state.get("demandas_only_mine") else "secondary"):
+    if filter_cols[6].button("👥 Todas", use_container_width=True, type="primary" if not st.session_state.get("demandas_only_mine") else "secondary"):
         st.session_state["demandas_only_mine"] = False
         st.rerun()
-    if action_col.button("🔄 Recarregar", use_container_width=True):
+    if filter_cols[7].button("🔄 Recarregar", use_container_width=True):
         load_demandas_web.clear()
         load_marcacoes_web.clear()
         st.rerun()
@@ -2335,21 +2343,6 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     minhas = int(filtered["minha_demanda"].astype(bool).sum())
     render_demandas_metrics(total, pendentes, concluidas, minhas)
 
-    search_text = st.text_input("Busca rápida", placeholder="Empresa, demanda, observação ou CNPJ", key="demandas_busca_rapida")
-    if search_text:
-        q = search_text.strip().upper()
-        blob = (
-            filtered["empresa"].astype(str) + " " +
-            filtered["tipo_demanda"].astype(str) + " " +
-            filtered["descricao"].astype(str) + " " +
-            filtered["observacao"].astype(str) + " " +
-            filtered["cnpj"].astype(str)
-        ).str.upper()
-        filtered = filtered[blob.str.contains(q, regex=False)].copy()
-        if filtered.empty:
-            st.info("Nenhuma demanda encontrada com a busca rápida atual.")
-            return
-
     st.markdown('<div class="action-bar">', unsafe_allow_html=True)
     selected_ids = _render_demandas_grid_aggrid(
         filtered.rename(
@@ -2373,66 +2366,101 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     selected_df = filtered[filtered["demanda_id"].astype(str).isin([str(value) for value in selected_ids])].copy()
     selected_count = len(selected_df)
 
-    action_left, action_center, action_right = st.columns([1.1, 1.1, 2.8], vertical_alignment="center")
-    justification = action_center.text_input("Justificativa para desmarcar", key="demandas_justificativa", placeholder="Explique por que está desmarcando.")
-    observation_text = action_right.text_area("Observação para selecionadas", key="demandas_observacao_text", height=90, placeholder="Escreva uma observação curta para aplicar nas demandas selecionadas.")
-    if action_left.button("✅ Concluir selecionadas", use_container_width=True, type="primary"):
-        if not selected_ids:
-            st.warning("Selecione ao menos uma demanda na tabela.")
-        else:
-            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "concluir", observacao=observation_text)
-            if applied:
-                st.toast("✅ Demandas concluídas com sucesso")
-            if denied:
-                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
-            if blocked:
-                st.warning("Algumas demandas estão bloqueadas.")
-            if applied:
-                st.rerun()
-    if action_center.button("↩️ Desmarcar selecionadas", use_container_width=True):
-        if not selected_ids:
-            st.warning("Selecione ao menos uma demanda na tabela.")
-        elif not justification.strip():
-            st.error("Explique por que está desmarcando.")
-        else:
-            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "desmarcar", observacao=observation_text, justificativa=justification)
-            if applied:
-                st.toast("↩️ Demandas desmarcadas com sucesso")
-            if denied:
-                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
-            if blocked:
-                st.warning("Algumas demandas estão bloqueadas.")
-            if applied:
-                st.session_state["demandas_justificativa"] = ""
-                st.rerun()
-    if action_right.button("▶️ Marcar em andamento", use_container_width=True):
-        if not selected_ids:
-            st.warning("Selecione ao menos uma demanda na tabela.")
-        else:
-            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "em_andamento", observacao=observation_text)
-            if applied:
-                st.toast("▶️ Demandas marcadas como em andamento")
-            if denied:
-                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
-            if blocked:
-                st.warning("Algumas demandas estão bloqueadas.")
-            if applied:
-                st.rerun()
-    if action_right.button("Salvar observacoes", use_container_width=True):
-        if not selected_ids:
-            st.warning("Selecione ao menos uma demanda na tabela.")
-        elif not observation_text.strip():
-            st.error("Informe uma observação para aplicar.")
-        else:
-            applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "observacao", observacao=observation_text)
-            if applied:
-                st.toast("Observacoes aplicadas com sucesso")
-            if denied:
-                st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
-            if blocked:
-                st.warning("Algumas demandas estão bloqueadas.")
-            if applied:
-                st.rerun()
+    quick_action_left, quick_action_right = st.columns([1.15, 4.85], vertical_alignment="center")
+    if quick_action_left.button("✅ Concluir selecionadas", use_container_width=True, type="primary", disabled=not selected_ids):
+        applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "concluir", observacao="")
+        if applied:
+            st.toast("✅ Demandas concluídas com sucesso")
+        if denied:
+            st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+        if blocked:
+            st.warning("Algumas demandas estão bloqueadas.")
+        if applied:
+            st.rerun()
+    quick_action_right.markdown(
+        f"<div class='muted-text' style='padding-top:0.45rem;'>Selecionadas: <strong>{selected_count}</strong>. As demais ações ficam no bloco recolhido abaixo.</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.expander(f"Ações nas selecionadas ({selected_count})", expanded=False):
+        action_left, action_center, action_right = st.columns([1.0, 1.0, 2.4], vertical_alignment="center")
+        justification = action_center.text_input(
+            "Justificativa para desmarcar",
+            key="demandas_justificativa",
+            placeholder="Explique por que está desmarcando.",
+        )
+        observation_text = action_right.text_area(
+            "Observação para selecionadas",
+            key="demandas_observacao_text",
+            height=72,
+            placeholder="Escreva uma observação curta para aplicar nas demandas selecionadas.",
+        )
+        if action_center.button("↩️ Desmarcar selecionadas", use_container_width=True):
+            if not selected_ids:
+                st.warning("Selecione ao menos uma demanda na tabela.")
+            elif not justification.strip():
+                st.error("Explique por que está desmarcando.")
+            else:
+                applied, denied, blocked = _demandas_apply_batch(
+                    filtered,
+                    selected_ids,
+                    username,
+                    role,
+                    "desmarcar",
+                    observacao=observation_text,
+                    justificativa=justification,
+                )
+                if applied:
+                    st.toast("↩️ Demandas desmarcadas com sucesso")
+                if denied:
+                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                if blocked:
+                    st.warning("Algumas demandas estão bloqueadas.")
+                if applied:
+                    st.session_state["demandas_justificativa"] = ""
+                    st.rerun()
+        if action_right.button("▶️ Marcar em andamento", use_container_width=True):
+            if not selected_ids:
+                st.warning("Selecione ao menos uma demanda na tabela.")
+            else:
+                applied, denied, blocked = _demandas_apply_batch(
+                    filtered,
+                    selected_ids,
+                    username,
+                    role,
+                    "em_andamento",
+                    observacao=observation_text,
+                )
+                if applied:
+                    st.toast("▶️ Demandas marcadas como em andamento")
+                if denied:
+                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                if blocked:
+                    st.warning("Algumas demandas estão bloqueadas.")
+                if applied:
+                    st.rerun()
+        if action_right.button("Salvar observacoes", use_container_width=True):
+            if not selected_ids:
+                st.warning("Selecione ao menos uma demanda na tabela.")
+            elif not observation_text.strip():
+                st.error("Informe uma observação para aplicar.")
+            else:
+                applied, denied, blocked = _demandas_apply_batch(
+                    filtered,
+                    selected_ids,
+                    username,
+                    role,
+                    "observacao",
+                    observacao=observation_text,
+                )
+                if applied:
+                    st.toast("Observacoes aplicadas com sucesso")
+                if denied:
+                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                if blocked:
+                    st.warning("Algumas demandas estão bloqueadas.")
+                if applied:
+                    st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
     _render_selected_demand_panel(filtered, selected_ids)
