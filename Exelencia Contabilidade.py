@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 try:
     from st_aggrid import AgGrid, DataReturnMode, GridOptionsBuilder, GridUpdateMode, JsCode
@@ -273,6 +274,21 @@ def inject_professional_ui_css() -> None:
             border: 1px solid rgba(148, 163, 184, 0.22);
             background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.76));
             box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .dashboard-panel-link {
+            display: block;
+            color: inherit;
+            text-decoration: none;
+        }
+        .dashboard-panel-link:hover .dashboard-panel,
+        .dashboard-panel-link:focus-visible .dashboard-panel {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 44px rgba(15, 23, 42, 0.10);
+            border-color: rgba(47, 111, 237, 0.34);
+        }
+        .dashboard-panel-link:hover {
+            text-decoration: none;
         }
         .dashboard-panel::after {
             content: "";
@@ -1691,59 +1707,203 @@ def render_home() -> None:
         regimes_distintos = 0
 
     st.markdown('<div class="section-title" style="margin-top:0.35rem;">Dashboards principais</div>', unsafe_allow_html=True)
-    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Dois painÃ©is diretos para entrar no fluxo operacional.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Dois painéis diretos para entrar no fluxo operacional.</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+            .st-key-home_demandas_click,
+            .st-key-home_empresas_click {
+                position: relative;
+                z-index: 20;
+                margin-top: -334px;
+                margin-bottom: -320px;
+            }
+            .st-key-home_demandas_click button,
+            .st-key-home_empresas_click button {
+                width: 100%;
+                height: 320px;
+                min-height: 320px;
+                opacity: 0;
+                background: transparent;
+                border: none;
+                box-shadow: none;
+                color: transparent;
+                padding: 0;
+                cursor: pointer;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     d1, d2 = st.columns(2, gap="large")
+
+    def render_click_card(kind: str, icon: str, kicker: str, title: str, desc: str, stats: list[tuple[str, object]], badge: str, tone: str) -> None:
+        stats_html = "".join(
+            f"""
+            <div class="home-card-stat">
+                <span>{escape(str(label))}</span>
+                <strong>{escape(str(value))}</strong>
+            </div>
+            """
+            for label, value in stats
+        )
+        html = f"""
+        <style>
+            .home-card {{
+                box-sizing: border-box;
+                width: 100%;
+                height: 100%;
+                min-height: 320px;
+                padding: 1.05rem 1.1rem 1rem;
+                border-radius: 22px;
+                border: 1px solid rgba(148, 163, 184, 0.22);
+                background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.76));
+                box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+                cursor: pointer;
+                user-select: none;
+                transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            }}
+            .home-card:hover {{
+                transform: translateY(-2px);
+                box-shadow: 0 24px 44px rgba(15, 23, 42, 0.10);
+                border-color: rgba(47, 111, 237, 0.34);
+            }}
+            .home-card--demandas {{
+                background: radial-gradient(circle at top left, rgba(47, 111, 237, 0.20), transparent 28%), linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(235, 243, 255, 0.92));
+            }}
+            .home-card--empresas {{
+                background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 28%), linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(236, 253, 245, 0.92));
+            }}
+            .home-card-top {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 0.55rem;
+            }}
+            .home-card-icon {{
+                font-size: 1.55rem;
+                line-height: 1;
+            }}
+            .home-card-kicker {{
+                display: inline-flex;
+                align-items: center;
+                padding: 0.32rem 0.6rem;
+                border-radius: 999px;
+                font-size: 0.74rem;
+                font-weight: 800;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: #0f172a;
+                background: rgba(255, 255, 255, 0.82);
+                border: 1px solid rgba(148, 163, 184, 0.22);
+            }}
+            .home-card-title {{
+                font-size: 1.18rem;
+                font-weight: 900;
+                color: #0f172a;
+                margin-bottom: 0.24rem;
+            }}
+            .home-card-desc {{
+                color: #64748b;
+                font-size: 0.93rem;
+                line-height: 1.35;
+                max-width: 42ch;
+            }}
+            .home-card-stats {{
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+                margin-top: 0.9rem;
+            }}
+            .home-card-stat {{
+                padding: 0.7rem 0.78rem;
+                border-radius: 16px;
+                background: rgba(255, 255, 255, 0.84);
+                border: 1px solid rgba(148, 163, 184, 0.20);
+                box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+            }}
+            .home-card-stat span {{
+                display: block;
+                font-size: 0.72rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #64748b;
+            }}
+            .home-card-stat strong {{
+                display: block;
+                margin-top: 0.18rem;
+                font-size: 1.25rem;
+                font-weight: 900;
+                color: #0f172a;
+                line-height: 1;
+            }}
+            .home-card-footer {{
+                margin-top: 0.95rem;
+                display: grid;
+                grid-template-columns: 1fr auto;
+                align-items: center;
+                gap: 10px;
+            }}
+            .home-card-hint {{
+                color: #64748b;
+                font-size: 0.84rem;
+            }}
+            .home-card-badge {{
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.36rem 0.62rem;
+                border-radius: 999px;
+                border: 1px solid rgba(148, 163, 184, 0.24);
+                background: rgba(255, 255, 255, 0.8);
+                color: #0f172a;
+                font-size: 0.8rem;
+                font-weight: 700;
+                white-space: nowrap;
+            }}
+        </style>
+        <div class="home-card home-card--{tone}">
+                <div class="home-card-top">
+                    <div class="home-card-icon">{icon}</div>
+                    <div class="home-card-kicker">{escape(kicker)}</div>
+                </div>
+                <div class="home-card-title">{escape(title)}</div>
+                <div class="home-card-desc">{escape(desc)}</div>
+                <div class="home-card-stats">{stats_html}</div>
+                <div class="home-card-footer">
+                    <div class="home-card-hint">Clique no painel para abrir.</div>
+                    <div class="home-card-badge">{escape(badge)}</div>
+                </div>
+            </div>
+        """
+        components.html(html, height=320, scrolling=False)
+
     with d1:
-        st.markdown(
-            f"""
-            <div class="dashboard-panel dashboard-panel--demandas">
-                <div class="dashboard-panel__top">
-                    <div class="dashboard-panel__icon">ðŸ“‹</div>
-                    <div class="dashboard-panel__kicker">OperaÃ§Ã£o diÃ¡ria</div>
-                </div>
-                <div class="dashboard-panel__title">Controle de Demandas</div>
-                <div class="dashboard-panel__desc">Veja pendÃªncias, concluÃ­das e a distribuiÃ§Ã£o da competÃªncia em um painel mais direto.</div>
-                <div class="dashboard-panel__stats">
-                    <div class="dashboard-panel__stat"><span>Total</span><strong>{total}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Pendentes</span><strong>{pendentes}</strong></div>
-                    <div class="dashboard-panel__stat"><span>ConcluÃ­das</span><strong>{concluidas}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Progresso</span><strong>{progresso:.0f}%</strong></div>
-                </div>
-                <div class="dashboard-panel__footer">
-                    <div class="dashboard-panel__hint">Acesso rÃ¡pido ao painel de trabalho.</div>
-                    <div class="status-badge">Fluxo operacional</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        render_click_card(
+            "Demandas",
+            "📋",
+            "Operação diária",
+            "Controle de Demandas",
+            "Veja pendências, concluídas e a distribuição da competência em um painel mais direto.",
+            [("Total", total), ("Pendentes", pendentes), ("Concluídas", concluidas), ("Progresso", f"{progresso:.0f}%")],
+            "Fluxo operacional",
+            "demandas",
         )
-        if st.button("ðŸ“‹ Acessar Demandas", key="home_demandas", type="primary", use_container_width=True):
-            navigate_to("Demandas", "ðŸ“‹ Demandas")
+        if st.button("Abrir demandas", key="home_demandas_click", use_container_width=True):
+            navigate_to("Demandas", "📋 Demandas")
     with d2:
-        st.markdown(
-            f"""
-            <div class="dashboard-panel dashboard-panel--empresas">
-                <div class="dashboard-panel__top">
-                    <div class="dashboard-panel__icon">ðŸ¢</div>
-                    <div class="dashboard-panel__kicker">Base operacional</div>
-                </div>
-                <div class="dashboard-panel__title">Controle de Empresas</div>
-                <div class="dashboard-panel__desc">Consulte clientes, ativos e filtros cadastrais em uma visÃ£o mais limpa e objetiva.</div>
-                <div class="dashboard-panel__stats">
-                    <div class="dashboard-panel__stat"><span>Total</span><strong>{empresas_total}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Ativas</span><strong>{empresas_ativas}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Inativas</span><strong>{empresas_inativas}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Regimes</span><strong>{regimes_distintos}</strong></div>
-                </div>
-                <div class="dashboard-panel__footer">
-                    <div class="dashboard-panel__hint">Acesso rÃ¡pido Ã  base de clientes.</div>
-                    <div class="status-badge">Consulta cadastral</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+        render_click_card(
+            "Empresas",
+            "🏢",
+            "Base operacional",
+            "Controle de Empresas",
+            "Consulte clientes, ativos e filtros cadastrais em uma visão mais limpa e objetiva.",
+            [("Total", empresas_total), ("Ativas", empresas_ativas), ("Inativas", empresas_inativas), ("Regimes", regimes_distintos)],
+            "Consulta cadastral",
+            "empresas",
         )
-        if st.button("ðŸ¢ Acessar Empresas", key="home_empresas", use_container_width=True):
+        if st.button("Abrir empresas", key="home_empresas_click", use_container_width=True):
             navigate_to("Empresas", "Empresas")
 
 
