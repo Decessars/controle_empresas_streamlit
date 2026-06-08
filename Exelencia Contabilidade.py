@@ -2358,8 +2358,45 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         row_style = JsCode(
             """
             function(params) {
+                function parseDeadline(value) {
+                    var text = String(value || '').trim();
+                    if (!text) return null;
+                    var raw = text.slice(0, 10);
+                    var parts = raw.indexOf('/') >= 0 ? raw.split('/') : (raw.indexOf('-') >= 0 ? raw.split('-') : null);
+                    if (!parts || parts.length < 3) return null;
+                    var day, month, year;
+                    if (raw.indexOf('/') >= 0) {
+                        day = parseInt(parts[0], 10);
+                        month = parseInt(parts[1], 10) - 1;
+                        year = parseInt(parts[2], 10);
+                    } else {
+                        year = parseInt(parts[0], 10);
+                        month = parseInt(parts[1], 10) - 1;
+                        day = parseInt(parts[2], 10);
+                    }
+                    if (!day || isNaN(day) || !month && month !== 0 || isNaN(month) || !year || isNaN(year)) return null;
+                    var d = new Date(year, month, day);
+                    if (isNaN(d.getTime())) return null;
+                    d.setHours(0, 0, 0, 0);
+                    return d;
+                }
+                function isOverdue(params) {
+                    if (!params || !params.data) return false;
+                    var status = String(params.data.status || '').toLowerCase().trim();
+                    if (status === 'concluida' || String(params.data.bloqueada) === '1') {
+                        return false;
+                    }
+                    var deadline = parseDeadline(params.data.data_limite || params.data['Data limite']);
+                    if (!deadline) return false;
+                    var today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return today > deadline;
+                }
                 if (params.data && String(params.data.bloqueada) === '1') {
                     return {backgroundColor: '#fff1f2', color: '#7f1d1d'};
+                }
+                if (isOverdue(params)) {
+                    return {backgroundColor: '#fee2e2', color: '#7f1d1d'};
                 }
                 if (params.data && (params.data.minha_demanda === true || String(params.data.minha_demanda).toLowerCase() === 'true')) {
                     return {backgroundColor: '#eff6ff'};
