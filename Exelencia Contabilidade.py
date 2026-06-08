@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import csv
@@ -555,7 +555,7 @@ def normalize_user(value: str) -> str:
 
 def extract_responsavel_from_observacao(value: str) -> str:
     text = str(value or "")
-    marker = "[Responsável:"
+    marker = "[ResponsÃ¡vel:"
     if marker not in text:
         marker = "[Responsavel:"
     if marker not in text:
@@ -587,8 +587,8 @@ def current_profile_label() -> str:
     return {
         "admin": "Administrador Geral",
         "contador": "Contador",
-        "estagiario": "Estagiário",
-    }.get(current_profile(), "Usuário")
+        "estagiario": "EstagiÃ¡rio",
+    }.get(current_profile(), "UsuÃ¡rio")
 
 
 def is_admin() -> bool:
@@ -656,7 +656,7 @@ def resolve_start_page() -> str:
     st.session_state["page_label"] = {
         "Home": "Home",
         "Empresas": "Empresas",
-        "Demandas": "📋 Demandas",
+        "Demandas": "ðŸ“‹ Demandas",
     }.get(page, page)
     if str(query_page or "") != page:
         st.query_params["page"] = page
@@ -986,7 +986,7 @@ def _normalize_ativo(value: object) -> str:
     text = str(value or "").strip().lower()
     if text in {"1", "1.0", "true", "sim", "ativo", "yes", "y"}:
         return "1"
-    if text in {"0", "0.0", "false", "nao", "não", "inativo", "no", "n"}:
+    if text in {"0", "0.0", "false", "nao", "nÃ£o", "inativo", "no", "n"}:
         return "0"
     return "1" if text == "" else text
 
@@ -1080,7 +1080,7 @@ def _normalize_demanda_flag(value: object) -> str:
     text = str(value or "").strip().lower()
     if text in {"1", "1.0", "true", "sim", "s", "yes", "y"}:
         return "1"
-    if text in {"0", "0.0", "false", "nao", "não", "n", "no"}:
+    if text in {"0", "0.0", "false", "nao", "nÃ£o", "n", "no"}:
         return "0"
     return "1" if text == "" else text
 
@@ -1253,7 +1253,7 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
     else:
         stars = (percentual_numeric.fillna(0) / 20).round().astype(int).clip(0, 5)
     frame["estrelas"] = stars.astype(str)
-    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "â€”")
 
     def _tempo_display(row: pd.Series) -> str:
         tempo_medio = str(row.get("tempo_medio", "")).strip()
@@ -1262,12 +1262,12 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
         if tempo_medio:
             return f"{tempo_medio} min"
         if tempo_min and tempo_max and tempo_min != tempo_max:
-            return f"{tempo_min}–{tempo_max} min"
+            return f"{tempo_min}â€“{tempo_max} min"
         if tempo_min:
             return f"{tempo_min} min"
         if tempo_max:
             return f"{tempo_max} min"
-        return "—"
+        return "â€”"
 
     frame["tempo_display"] = frame.apply(_tempo_display, axis=1)
     frame["responsavel_display"] = frame["responsavel_operacional"].where(
@@ -1278,21 +1278,21 @@ def normalize_demandas_web(df: pd.DataFrame, empresas: pd.DataFrame | None = Non
     frame["status"] = frame["status"].replace("", "pendente")
     frame["status_visual"] = frame["status"].map(
         {
-            "pendente": "⚪ Pendente",
-            "em_andamento": "▶️ Em andamento",
-            "concluida": "✅ Concluída",
-            "bloqueada": "🔒 Bloqueada",
+            "pendente": "âšª Pendente",
+            "em_andamento": "â–¶ï¸ Em andamento",
+            "concluida": "âœ… ConcluÃ­da",
+            "bloqueada": "ðŸ”’ Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
     frame["status_label"] = frame["status"].map(
         {
             "pendente": "Pendente",
             "em_andamento": "Em andamento",
-            "concluida": "Concluída",
+            "concluida": "ConcluÃ­da",
             "bloqueada": "Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
-    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
+    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"ðŸ”’ {value}" if value.strip() else "")
     if "data_limite" in frame.columns:
         fallback = frame.apply(lambda row: _demand_deadline(row.get("tipo_codigo", ""), row.get("competencia", "")), axis=1)
         frame["data_limite"] = frame["data_limite"].where(frame["data_limite"].astype(str).str.strip().ne(""), fallback)
@@ -1347,6 +1347,20 @@ def load_demandas_web() -> pd.DataFrame:
         except Exception:
             pass
     return normalize_demandas_web(pd.DataFrame())
+
+
+def save_demandas_web(df: pd.DataFrame) -> None:
+    normalized = normalize_demandas_web(df, load_empresas_web())
+    storage = normalized[DEMANDAS_COLUMNS].copy()
+    DEMANDAS_CSV.parent.mkdir(parents=True, exist_ok=True)
+    storage.to_csv(DEMANDAS_CSV, index=False, encoding="utf-8-sig")
+    if usar_google_sheets():
+        try:
+            salvar_dataframe_google(DEMANDAS_SHEET, storage, DEMANDAS_COLUMNS)
+        except Exception:
+            pass
+    load_data.clear()
+    load_demandas_web.clear()
 
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS)
@@ -1456,26 +1470,26 @@ def apply_marcacoes_to_view(df_demandas: pd.DataFrame, df_marcacoes: pd.DataFram
     frame["status"] = frame["status"].replace("", "pendente")
     frame["status_visual"] = frame["status"].map(
         {
-            "pendente": "⚪ Pendente",
-            "em_andamento": "▶️ Em andamento",
-            "concluida": "✅ Concluída",
-            "bloqueada": "🔒 Bloqueada",
+            "pendente": "âšª Pendente",
+            "em_andamento": "â–¶ï¸ Em andamento",
+            "concluida": "âœ… ConcluÃ­da",
+            "bloqueada": "ðŸ”’ Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
     frame["status_label"] = frame["status"].map(
         {
             "pendente": "Pendente",
             "em_andamento": "Em andamento",
-            "concluida": "Concluída",
+            "concluida": "ConcluÃ­da",
             "bloqueada": "Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
-    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"🔒 {value}" if value.strip() else "")
+    frame["bloqueio_display"] = frame["motivo_bloqueio"].astype(str).map(lambda value: f"ðŸ”’ {value}" if value.strip() else "")
     frame["responsavel_display"] = frame["responsavel_operacional"].where(
         frame["responsavel_operacional"].astype(str).str.strip().ne(""),
         frame["estagiario_responsavel"],
     )
-    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "—")
+    frame["estrelas_visual"] = frame["estrelas"].map(lambda value: "?" * int(value) if str(value).isdigit() and int(value) > 0 else "â€”")
     return frame
 
 
@@ -1548,8 +1562,8 @@ def sidebar(metadata: dict) -> str:
             navigate_to("Home", "Home")
         if st.button("Empresas", use_container_width=True):
             navigate_to("Empresas", "Empresas")
-        if st.button("📋 Demandas", use_container_width=True):
-            navigate_to("Demandas", "📋 Demandas")
+        if st.button("ðŸ“‹ Demandas", use_container_width=True):
+            navigate_to("Demandas", "ðŸ“‹ Demandas")
         competencia = str(metadata.get("competencia_atual") or "2026-05")
         st.caption(f"Competencia: {competencia}")
         st.caption(f"Atualizado: {metadata.get('data_ultima_atualizacao', '')}")
@@ -1577,14 +1591,14 @@ def render_topbar(competencia: str) -> None:
             <div class="topbar-brand">
                 <div>
                     <div class="topbar-brand-name">DMLS Controle</div>
-                    <div class="topbar-brand-subtitle">{escape(str(page_label))} • Competência {escape(str(competencia))}</div>
+                    <div class="topbar-brand-subtitle">{escape(str(page_label))} â€¢ CompetÃªncia {escape(str(competencia))}</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     with c2:
-        st.markdown(f"<span class='status-badge'>Usuário: {escape(current_user())}</span>", unsafe_allow_html=True)
+        st.markdown(f"<span class='status-badge'>UsuÃ¡rio: {escape(current_user())}</span>", unsafe_allow_html=True)
     with c3:
         st.markdown(f"<span class='status-badge'>Perfil: {escape(current_profile_label())}</span>", unsafe_allow_html=True)
     with c4:
@@ -1608,8 +1622,8 @@ def render_home() -> None:
     st.markdown(
         f"""
         <div class="home-hero">
-            <h1>Olá, {escape(current_user())}</h1>
-            <p>Competência atual: {escape(competencia)}</p>
+            <h1>OlÃ¡, {escape(current_user())}</h1>
+            <p>CompetÃªncia atual: {escape(competencia)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1642,7 +1656,7 @@ def render_home() -> None:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="label">Concluídas</div>
+                <div class="label">ConcluÃ­das</div>
                 <span class="value">{concluidas}</span>
                 <div class="hint">Demandas finalizadas</div>
             </div>
@@ -1655,7 +1669,7 @@ def render_home() -> None:
             <div class="metric-card">
                 <div class="label">Progresso geral</div>
                 <span class="value">{progresso:.0f}%</span>
-                <div class="hint">Conclusão simples da competência</div>
+                <div class="hint">ConclusÃ£o simples da competÃªncia</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1677,44 +1691,44 @@ def render_home() -> None:
         regimes_distintos = 0
 
     st.markdown('<div class="section-title" style="margin-top:0.35rem;">Dashboards principais</div>', unsafe_allow_html=True)
-    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Dois painéis diretos para entrar no fluxo operacional.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted-text" style="margin-bottom:0.55rem;">Dois painÃ©is diretos para entrar no fluxo operacional.</div>', unsafe_allow_html=True)
     d1, d2 = st.columns(2, gap="large")
     with d1:
         st.markdown(
             f"""
             <div class="dashboard-panel dashboard-panel--demandas">
                 <div class="dashboard-panel__top">
-                    <div class="dashboard-panel__icon">📋</div>
-                    <div class="dashboard-panel__kicker">Operação diária</div>
+                    <div class="dashboard-panel__icon">ðŸ“‹</div>
+                    <div class="dashboard-panel__kicker">OperaÃ§Ã£o diÃ¡ria</div>
                 </div>
                 <div class="dashboard-panel__title">Controle de Demandas</div>
-                <div class="dashboard-panel__desc">Veja pendências, concluídas e a distribuição da competência em um painel mais direto.</div>
+                <div class="dashboard-panel__desc">Veja pendÃªncias, concluÃ­das e a distribuiÃ§Ã£o da competÃªncia em um painel mais direto.</div>
                 <div class="dashboard-panel__stats">
                     <div class="dashboard-panel__stat"><span>Total</span><strong>{total}</strong></div>
                     <div class="dashboard-panel__stat"><span>Pendentes</span><strong>{pendentes}</strong></div>
-                    <div class="dashboard-panel__stat"><span>Concluídas</span><strong>{concluidas}</strong></div>
+                    <div class="dashboard-panel__stat"><span>ConcluÃ­das</span><strong>{concluidas}</strong></div>
                     <div class="dashboard-panel__stat"><span>Progresso</span><strong>{progresso:.0f}%</strong></div>
                 </div>
                 <div class="dashboard-panel__footer">
-                    <div class="dashboard-panel__hint">Acesso rápido ao painel de trabalho.</div>
+                    <div class="dashboard-panel__hint">Acesso rÃ¡pido ao painel de trabalho.</div>
                     <div class="status-badge">Fluxo operacional</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.button("📋 Acessar Demandas", key="home_demandas", type="primary", use_container_width=True):
-            navigate_to("Demandas", "📋 Demandas")
+        if st.button("ðŸ“‹ Acessar Demandas", key="home_demandas", type="primary", use_container_width=True):
+            navigate_to("Demandas", "ðŸ“‹ Demandas")
     with d2:
         st.markdown(
             f"""
             <div class="dashboard-panel dashboard-panel--empresas">
                 <div class="dashboard-panel__top">
-                    <div class="dashboard-panel__icon">🏢</div>
+                    <div class="dashboard-panel__icon">ðŸ¢</div>
                     <div class="dashboard-panel__kicker">Base operacional</div>
                 </div>
                 <div class="dashboard-panel__title">Controle de Empresas</div>
-                <div class="dashboard-panel__desc">Consulte clientes, ativos e filtros cadastrais em uma visão mais limpa e objetiva.</div>
+                <div class="dashboard-panel__desc">Consulte clientes, ativos e filtros cadastrais em uma visÃ£o mais limpa e objetiva.</div>
                 <div class="dashboard-panel__stats">
                     <div class="dashboard-panel__stat"><span>Total</span><strong>{empresas_total}</strong></div>
                     <div class="dashboard-panel__stat"><span>Ativas</span><strong>{empresas_ativas}</strong></div>
@@ -1722,14 +1736,14 @@ def render_home() -> None:
                     <div class="dashboard-panel__stat"><span>Regimes</span><strong>{regimes_distintos}</strong></div>
                 </div>
                 <div class="dashboard-panel__footer">
-                    <div class="dashboard-panel__hint">Acesso rápido à base de clientes.</div>
+                    <div class="dashboard-panel__hint">Acesso rÃ¡pido Ã  base de clientes.</div>
                     <div class="status-badge">Consulta cadastral</div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        if st.button("🏢 Acessar Empresas", key="home_empresas", use_container_width=True):
+        if st.button("ðŸ¢ Acessar Empresas", key="home_empresas", use_container_width=True):
             navigate_to("Empresas", "Empresas")
 
 
@@ -1777,16 +1791,16 @@ def _company_blob(df: pd.DataFrame) -> pd.Series:
 def _empresa_detail_html(row: pd.Series) -> str:
     return f"""
     <div class="main-card">
-        <div class="section-title">Detalhe rápido</div>
-        <div class="muted-text" style="margin-bottom:0.4rem;">Visão resumida da empresa selecionada.</div>
+        <div class="section-title">Detalhe rÃ¡pido</div>
+        <div class="muted-text" style="margin-bottom:0.4rem;">VisÃ£o resumida da empresa selecionada.</div>
         <div class="status-badge">CNPJ: {escape(str(row.get("cnpj", "")))}</div>
         <div style="height:8px"></div>
-        <div><strong>Razão Social:</strong> {escape(str(row.get("razao_social", "")))}</div>
+        <div><strong>RazÃ£o Social:</strong> {escape(str(row.get("razao_social", "")))}</div>
         <div><strong>Nome Fantasia:</strong> {escape(str(row.get("nome_fantasia", "")))}</div>
         <div><strong>Apelido:</strong> {escape(str(row.get("apelido", "")))}</div>
         <div><strong>Regime:</strong> {escape(str(row.get("regime", "")))}</div>
         <div><strong>Cidade/UF:</strong> {escape(str(row.get("cidade", "")))} / {escape(str(row.get("uf", "")))}</div>
-        <div><strong>Contador responsável:</strong> {escape(str(row.get("contador_responsavel", "")))}</div>
+        <div><strong>Contador responsÃ¡vel:</strong> {escape(str(row.get("contador_responsavel", "")))}</div>
         <div><strong>Status:</strong> {_empresa_status_label(str(row.get("ativo", "")))}</div>
     </div>
     """
@@ -1801,7 +1815,7 @@ def _selected_empresa_frame(empresas: pd.DataFrame, selected_id: str) -> pd.Data
 
 
 def render_empresas(empresas: pd.DataFrame) -> None:
-    header("Controle de Empresas", "Consulta rápida dos clientes exportados pelo sistema principal.")
+    header("Controle de Empresas", "Consulta rÃ¡pida dos clientes exportados pelo sistema principal.")
 
     empresas_df = load_empresas_web()
     if empresas_df.empty:
@@ -1820,26 +1834,26 @@ def render_empresas(empresas: pd.DataFrame) -> None:
     with m1:
         st.markdown(f"<div class='metric-card'><div class='label'>Total de empresas</div><span class='value'>{total_empresas}</span><div class='hint'>Base operacional carregada</div></div>", unsafe_allow_html=True)
     with m2:
-        st.markdown(f"<div class='metric-card'><div class='label'>Ativas</div><span class='value'>{ativas}</span><div class='hint'>Clientes em operação</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='label'>Ativas</div><span class='value'>{ativas}</span><div class='hint'>Clientes em operaÃ§Ã£o</div></div>", unsafe_allow_html=True)
     with m3:
         st.markdown(f"<div class='metric-card'><div class='label'>Inativas</div><span class='value'>{inativas}</span><div class='hint'>Clientes suspensos</div></div>", unsafe_allow_html=True)
     with m4:
         st.markdown(f"<div class='metric-card'><div class='label'>Regimes</div><span class='value'>{regimes}</span><div class='hint'>Tipos distintos</div></div>", unsafe_allow_html=True)
 
     c1, c2, c3, c4, c5, c6 = st.columns([2.4, 1.2, 1.2, 1.0, 0.7, 0.9], vertical_alignment="bottom")
-    busca = c1.text_input("Busca geral", placeholder="CNPJ, apelido, razão social, fantasia, cidade", key="empresas_busca")
+    busca = c1.text_input("Busca geral", placeholder="CNPJ, apelido, razÃ£o social, fantasia, cidade", key="empresas_busca")
     regimes_options = ["Todos"] + sorted([v for v in df["regime"].astype(str).unique().tolist() if v.strip()])
     regime = c2.selectbox("Regime", regimes_options, key="empresas_regime")
     responsaveis_options = ["Todos"] + sorted([v for v in df["contador_responsavel"].astype(str).unique().tolist() if v.strip()])
-    responsavel = c3.selectbox("Contador responsável", responsaveis_options, key="empresas_responsavel")
+    responsavel = c3.selectbox("Contador responsÃ¡vel", responsaveis_options, key="empresas_responsavel")
     status = c4.selectbox("Ativo/Inativo", ["Todos", "Ativas", "Inativas"], key="empresas_status")
     sort_col = c5.selectbox("Ordenar por", ["apelido", "razao_social", "cnpj", "regime", "cidade", "uf", "contador_responsavel", "ativo"], key="empresas_sort_col")
     sort_dir = c6.selectbox("Ordem", ["A-Z", "Z-A"], key="empresas_sort_dir")
 
     action_left, action_right = st.columns([0.9, 2.2], vertical_alignment="center")
-    if action_left.button("🔄 Recarregar", use_container_width=True):
+    if action_left.button("ðŸ”„ Recarregar", use_container_width=True):
         st.rerun()
-    st.caption("Exportação CSV disponível para perfis administrativos.")
+    st.caption("ExportaÃ§Ã£o CSV disponÃ­vel para perfis administrativos.")
 
     df = df.copy()
     if busca:
@@ -1860,7 +1874,7 @@ def render_empresas(empresas: pd.DataFrame) -> None:
     view = df.rename(
         columns={
             "apelido": "Apelido",
-            "razao_social": "Razão Social",
+            "razao_social": "RazÃ£o Social",
             "cnpj": "CNPJ",
             "regime": "Regime",
             "cidade": "Cidade",
@@ -1868,14 +1882,14 @@ def render_empresas(empresas: pd.DataFrame) -> None:
             "contador_responsavel": "Contador",
             "ativo": "Ativo",
         }
-    )[["Apelido", "Razão Social", "CNPJ", "Regime", "Cidade", "UF", "Contador", "Ativo"]]
+    )[["Apelido", "RazÃ£o Social", "CNPJ", "Regime", "Cidade", "UF", "Contador", "Ativo"]]
     view_display = view.copy()
     view_display["Ativo"] = view_display["Ativo"].map(_empresa_status_label)
     view_display = view_display.reset_index(drop=True)
 
     export_bytes = df.to_csv(index=False).encode("utf-8-sig")
     action_right.download_button(
-        "📤 Exportar visão filtrada",
+        "ðŸ“¤ Exportar visÃ£o filtrada",
         data=export_bytes,
         file_name="empresas_visao_filtrada.csv",
         mime="text/csv",
@@ -1891,7 +1905,7 @@ def render_empresas(empresas: pd.DataFrame) -> None:
         height=420,
         column_config={
             "Apelido": st.column_config.TextColumn("Apelido", width="medium"),
-            "Razão Social": st.column_config.TextColumn("Razão Social", width="large"),
+            "RazÃ£o Social": st.column_config.TextColumn("RazÃ£o Social", width="large"),
             "CNPJ": st.column_config.TextColumn("CNPJ", width="medium"),
             "Regime": st.column_config.TextColumn("Regime", width="medium"),
             "Cidade": st.column_config.TextColumn("Cidade", width="medium"),
@@ -1902,7 +1916,7 @@ def render_empresas(empresas: pd.DataFrame) -> None:
     )
 
     st.markdown('<div class="main-card" style="margin-top:0.75rem;">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Detalhe rápido</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Detalhe rÃ¡pido</div>', unsafe_allow_html=True)
     if view.empty:
         st.info("Nenhuma empresa encontrada com os filtros atuais.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -1910,7 +1924,7 @@ def render_empresas(empresas: pd.DataFrame) -> None:
 
     detail_options = df["empresa_id"].astype(str).tolist() if "empresa_id" in df.columns else df["cnpj"].astype(str).tolist()
     detail_labels = {
-        str(option): f"{str(apelido)} • {str(cnpj)}"
+        str(option): f"{str(apelido)} â€¢ {str(cnpj)}"
         for option, apelido, cnpj in zip(detail_options, df["apelido"].astype(str).tolist(), df["cnpj"].astype(str).tolist())
     }
     selected_detail = st.selectbox(
@@ -1926,7 +1940,7 @@ def render_empresas(empresas: pd.DataFrame) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
     if current_profile() != "estagiario":
-        with st.expander("Edição simples da empresa selecionada", expanded=False):
+        with st.expander("EdiÃ§Ã£o simples da empresa selecionada", expanded=False):
             if selected_row.empty:
                 st.info("Selecione uma empresa para editar.")
             else:
@@ -1935,9 +1949,9 @@ def render_empresas(empresas: pd.DataFrame) -> None:
                     apelido = st.text_input("Apelido", value=str(row.get("apelido", "")))
                     cidade = st.text_input("Cidade", value=str(row.get("cidade", "")))
                     uf = st.text_input("UF", value=str(row.get("uf", "")), max_chars=2)
-                    contador_responsavel = st.text_input("Contador responsável", value=str(row.get("contador_responsavel", "")))
+                    contador_responsavel = st.text_input("Contador responsÃ¡vel", value=str(row.get("contador_responsavel", "")))
                     ativo_value = st.selectbox("Ativo", ["1", "0"], index=0 if str(row.get("ativo", "1")) == "1" else 1)
-                    save_simple = st.form_submit_button("💾 Salvar ajustes", type="primary")
+                    save_simple = st.form_submit_button("ðŸ’¾ Salvar ajustes", type="primary")
                 if save_simple:
                     updated = base_df.copy()
                     key_col = "empresa_id" if "empresa_id" in updated.columns else "cnpj"
@@ -1989,12 +2003,12 @@ def render_demandas_metrics(total: int, pendentes: int, concluidas: int, minhas:
     top_row = st.columns(3)
     bottom_row = st.columns(3)
     cards = [
-        ("Total", total, "Demandas visíveis na competência"),
+        ("Total", total, "Demandas visÃ­veis na competÃªncia"),
         ("Pendentes", pendentes, "Ainda abertas para trabalho"),
-        ("Concluídas", concluidas, "Finalizadas no painel"),
+        ("ConcluÃ­das", concluidas, "Finalizadas no painel"),
         ("Minhas", minhas, "Sob sua responsabilidade"),
-        ("Meu percentual", f"{meu_pct:.0f}%", "Minha participação sobre o total"),
-        ("Percentual geral", f"{geral_pct:.0f}%", "Conclusão simples da tela"),
+        ("Meu percentual", f"{meu_pct:.0f}%", "Minha participaÃ§Ã£o sobre o total"),
+        ("Percentual geral", f"{geral_pct:.0f}%", "ConclusÃ£o simples da tela"),
     ]
     for idx, (label, value, hint) in enumerate(cards):
         container = top_row[idx] if idx < 3 else bottom_row[idx - 3]
@@ -2033,10 +2047,10 @@ def build_demandas_view(df: pd.DataFrame, username: str, role: str, empresas: pd
     frame.loc[frame["bloqueada"].astype(str).eq("1"), "status"] = "bloqueada"
     frame["status_visual"] = frame["status"].map(
         {
-            "pendente": "⚪ Pendente",
-            "em_andamento": "▶️ Em andamento",
-            "concluida": "✅ Concluída",
-            "bloqueada": "🔒 Bloqueada",
+            "pendente": "âšª Pendente",
+            "em_andamento": "â–¶ï¸ Em andamento",
+            "concluida": "âœ… ConcluÃ­da",
+            "bloqueada": "ðŸ”’ Bloqueada",
         }
     ).fillna(frame["status"].astype(str))
     frame["minha_demanda"] = (
@@ -2097,21 +2111,21 @@ def _demandas_apply_batch(
 
 
 def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
-    status_options = ["Pendente", "Em andamento", "Concluída"]
+    status_options = ["Pendente", "Em andamento", "ConcluÃ­da"]
     status_to_internal = {
         "Pendente": "pendente",
         "Em andamento": "em_andamento",
-        "Concluída": "concluida",
+        "ConcluÃ­da": "concluida",
     }
     internal_to_status = {value: key for key, value in status_to_internal.items()}
     visible_order = [
         "Empresa",
         "Demanda",
-        "Responsável",
+        "ResponsÃ¡vel",
         "Status",
-        "Observação",
-        "Concluída em",
-        "Concluída por",
+        "ObservaÃ§Ã£o",
+        "ConcluÃ­da em",
+        "ConcluÃ­da por",
         "Bloqueio",
     ]
     hidden_order = [
@@ -2138,6 +2152,23 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             .drop(columns=["_demanda_ordem", "_demanda_texto"])
         )
     preselected_ids = {str(value) for value in st.session_state.get("demandas_selected_ids", []) if str(value).strip()}
+    responsavel_options = sorted(
+        {
+            normalize_user(value)
+            for value in pd.concat(
+                [
+                    grid_df.get("ResponsÃ¡vel", pd.Series(dtype=str)),
+                    grid_df.get("responsavel_operacional", pd.Series(dtype=str)),
+                    grid_df.get("estagiario_responsavel", pd.Series(dtype=str)),
+                    pd.Series(list(PASSWORD_HASHES.keys()), dtype=str),
+                ],
+                ignore_index=True,
+            ).astype(str)
+            if str(value).strip()
+        }
+    )
+    if current_user() not in responsavel_options:
+        responsavel_options = sorted(set(responsavel_options) | {current_user()})
     if FORCE_NATIVE_GRID or not AGGRID_AVAILABLE:
         fallback_columns = [col for col in grid_df.columns if col not in hidden_order and col != "data_limite"]
         fallback = grid_df[fallback_columns].copy()
@@ -2181,10 +2212,15 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
                 current_user(),
                 "status",
                 current_status_internal,
-                observacao=str(row.get("Observacao", row.get("Observação", ""))),
+                observacao=str(row.get("Observacao", row.get("ObservaÃ§Ã£o", ""))),
             )
             status_baseline[demanda_id] = current_status_internal
             changes_applied += 1
+        if responsavel_changed and not demandas_base.empty:
+            save_demandas_web(demandas_base.reset_index(drop=True))
+            st.session_state["demandas_responsavel_baseline"] = responsavel_baseline
+            st.toast("Responsável atualizado com sucesso")
+            st.rerun()
         if changes_applied:
             st.session_state["demandas_status_baseline"] = status_baseline
             st.toast("Status salvo em segundo plano")
@@ -2218,7 +2254,13 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         builder.configure_column(column, hide=True)
     builder.configure_column("Empresa", minWidth=180)
     builder.configure_column("Demanda", minWidth=220, sortable=True, sort="asc")
-    builder.configure_column("Responsável", minWidth=120)
+    builder.configure_column(
+        "ResponsÃ¡vel",
+        minWidth=140,
+        editable=is_admin(),
+        cellEditor="agSelectCellEditor",
+        cellEditorParams={"values": responsavel_options},
+    )
     if JsCode is not None:
         status_editable = JsCode(
             """
@@ -2308,9 +2350,9 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             cellStyle=status_cell_style,
         )
     builder.configure_column("Data limite", minWidth=120)
-    builder.configure_column("Observação", minWidth=220)
-    builder.configure_column("Concluída em", minWidth=145)
-    builder.configure_column("Concluída por", minWidth=130)
+    builder.configure_column("ObservaÃ§Ã£o", minWidth=220)
+    builder.configure_column("ConcluÃ­da em", minWidth=145)
+    builder.configure_column("ConcluÃ­da por", minWidth=130)
     builder.configure_column("Bloqueio", minWidth=180)
     if JsCode is not None:
         row_style = JsCode(
@@ -2328,6 +2370,11 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
         )
         builder.configure_grid_options(getRowStyle=row_style)
     grid_options = builder.build()
+    st.session_state["demandas_responsavel_baseline"] = {
+        str(row.get("demanda_id", "")).strip(): normalize_user(str(row.get("ResponsÃ¡vel", "")).strip())
+        for _, row in grid_df.iterrows()
+        if str(row.get("demanda_id", "")).strip()
+    }
     response = AgGrid(
         grid_df,
         gridOptions=grid_options,
@@ -2344,10 +2391,24 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     if isinstance(edited_data, pd.DataFrame) and not edited_data.empty:
         changes_applied = 0
         status_baseline = st.session_state.setdefault("demandas_status_baseline", {})
+        responsavel_baseline = st.session_state.setdefault("demandas_responsavel_baseline", {})
+        demandas_base = load_demandas_web().copy()
+        if not demandas_base.empty and "demanda_id" in demandas_base.columns:
+            demandas_base = demandas_base.set_index("demanda_id", drop=False)
+        responsavel_changed = False
         for _, row in edited_data.iterrows():
             demanda_id = str(row.get("demanda_id", "")).strip()
             if not demanda_id:
                 continue
+            current_responsavel = normalize_user(str(row.get("Responsável", "")).strip())
+            baseline_responsavel = normalize_user(str(responsavel_baseline.get(demanda_id, "")).strip())
+            if is_admin() and current_responsavel and current_responsavel != baseline_responsavel:
+                if not demandas_base.empty and demanda_id in demandas_base.index:
+                    demandas_base.at[demanda_id, "responsavel_operacional"] = current_responsavel
+                    demandas_base.at[demanda_id, "estagiario_responsavel"] = ""
+                    demandas_base.at[demanda_id, "atualizado_em"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    responsavel_baseline[demanda_id] = current_responsavel
+                    responsavel_changed = True
             original_status_internal = str(row.get("status", "")).strip().lower()
             current_status_label = str(row.get("Status", "")).strip()
             if not current_status_label:
@@ -2372,10 +2433,15 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             )
             status_baseline[demanda_id] = current_status_internal
             changes_applied += 1
+        if responsavel_changed and not demandas_base.empty:
+            save_demandas_web(demandas_base.reset_index(drop=True))
+            st.session_state["demandas_responsavel_baseline"] = responsavel_baseline
+            st.toast("Responsável atualizado com sucesso")
+            st.rerun()
         if changes_applied:
             st.session_state["demandas_status_baseline"] = status_baseline
             load_marcacoes_web.clear()
-            st.toast("✅ Status atualizado com sucesso")
+            st.toast("âœ… Status atualizado com sucesso")
     selected_rows = response.get("selected_rows", [])
     if isinstance(selected_rows, pd.DataFrame):
         if selected_rows.empty or "demanda_id" not in selected_rows.columns:
@@ -2412,13 +2478,13 @@ def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> 
         f"""
         <div class="main-card">
             <div class="section-title">Detalhes da demanda selecionada</div>
-            <div class="muted-text" style="margin-bottom:0.4rem;">{escape(str(len(selected_ids)))} demanda(s) selecionada(s). Mostrando a primeira seleção.</div>
+            <div class="muted-text" style="margin-bottom:0.4rem;">{escape(str(len(selected_ids)))} demanda(s) selecionada(s). Mostrando a primeira seleÃ§Ã£o.</div>
             <div><strong>Empresa:</strong> {escape(str(row.get("Empresa", row.get("empresa", ""))))}</div>
             <div><strong>Tipo:</strong> {escape(str(row.get("Demanda", row.get("tipo_demanda", ""))))}</div>
-            <div><strong>Responsável:</strong> {escape(str(row.get("Responsável", row.get("responsavel_display", ""))))}</div>
+            <div><strong>ResponsÃ¡vel:</strong> {escape(str(row.get("ResponsÃ¡vel", row.get("responsavel_display", ""))))}</div>
             <div><strong>Status:</strong> {escape(str(row.get("Status", row.get("status_visual", ""))))}</div>
             <div><strong>Data limite:</strong> {escape(_format_date_display(row.get("Data limite", row.get("data_limite", ""))))}</div>
-            <div><strong>Observação:</strong> {escape(str(row.get("Observação", row.get("observacao", ""))))}</div>
+            <div><strong>ObservaÃ§Ã£o:</strong> {escape(str(row.get("ObservaÃ§Ã£o", row.get("observacao", ""))))}</div>
             <div><strong>Bloqueio:</strong> {escape(str(row.get("Bloqueio", row.get("bloqueio_display", ""))))}</div>
         </div>
         """,
@@ -2427,7 +2493,7 @@ def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> 
 
 
 def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_padrao: str) -> None:
-    header("📋 Controle de Demandas", "Visualize, filtre e marque as demandas operacionais da competência.")
+    header("ðŸ“‹ Controle de Demandas", "Visualize, filtre e marque as demandas operacionais da competÃªncia.")
 
     username = current_user()
     role = current_profile()
@@ -2455,7 +2521,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
     filter_cols = st.columns([1.0, 1.02, 1.08, 1.08, 1.35, 0.92, 0.92, 0.92, 0.92], vertical_alignment="bottom")
     competencia = filter_cols[0].selectbox(
-        "Competência",
+        "CompetÃªncia",
         competencias_options or [competence_default],
         index=(competencias_options.index(competence_default) if competence_default in competencias_options else 0),
         key="demandas_competencia",
@@ -2467,23 +2533,23 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
         key="demandas_status",
     )
     st.session_state["demandas_status_filter"] = status
-    responsavel = filter_cols[2].selectbox("Responsável / Estagiário", responsavel_options, key="demandas_responsavel")
+    responsavel = filter_cols[2].selectbox("ResponsÃ¡vel / EstagiÃ¡rio", responsavel_options, key="demandas_responsavel")
     empresa = filter_cols[3].selectbox("Empresa", empresa_options, key="demandas_empresa")
     tipo = filter_cols[4].selectbox("Tipo de demanda", tipo_options, key="demandas_tipo")
 
-    if filter_cols[5].button("🎯 Minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
+    if filter_cols[5].button("ðŸŽ¯ Minhas", use_container_width=True, type="primary" if st.session_state.get("demandas_only_mine") else "secondary"):
         st.session_state["demandas_only_mine"] = True
         st.session_state["demandas_show_all"] = False
         st.session_state["demandas_hide_concluidas"] = True
         st.rerun()
-    if filter_cols[6].button("👥 Todos", use_container_width=True, type="primary" if st.session_state.get("demandas_show_all") else "secondary"):
+    if filter_cols[6].button("ðŸ‘¥ Todos", use_container_width=True, type="primary" if st.session_state.get("demandas_show_all") else "secondary"):
         st.session_state["demandas_only_mine"] = False
         st.session_state["demandas_show_all"] = True
         st.session_state["demandas_hide_concluidas"] = False
         st.rerun()
     hide_concluidas = st.session_state.get("demandas_hide_concluidas", False)
     if filter_cols[7].button(
-        "🙈 Ocultar" if not hide_concluidas else "👁️ Mostrar",
+        "ðŸ™ˆ Ocultar" if not hide_concluidas else "ðŸ‘ï¸ Mostrar",
         use_container_width=True,
         type="primary" if hide_concluidas else "secondary",
     ):
@@ -2491,7 +2557,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
         st.session_state["demandas_hide_concluidas"] = new_hide
         st.session_state["demandas_show_all"] = not new_hide
         st.rerun()
-    if filter_cols[8].button("🔄 Atualizar", use_container_width=True):
+    if filter_cols[8].button("ðŸ”„ Atualizar", use_container_width=True):
         load_demandas_web.clear()
         load_marcacoes_web.clear()
         st.rerun()
@@ -2530,11 +2596,11 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
             columns={
                 "empresa": "Empresa",
                 "demanda_display": "Demanda",
-                "responsavel_display": "Responsável",
+                "responsavel_display": "ResponsÃ¡vel",
                 "status_label": "Status",
-                "observacao": "Observação",
-                "concluida_em": "Concluída em",
-                "concluida_por": "Concluída por",
+                "observacao": "ObservaÃ§Ã£o",
+                "concluida_em": "ConcluÃ­da em",
+                "concluida_por": "ConcluÃ­da por",
                 "bloqueio_display": "Bloqueio",
             }
         )
@@ -2546,39 +2612,39 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     selected_count = len(selected_df)
 
     quick_action_left, quick_action_right = st.columns([1.15, 4.85], vertical_alignment="center")
-    if quick_action_left.button("✅ Concluir selecionadas", use_container_width=True, type="primary", disabled=not selected_ids):
+    if quick_action_left.button("âœ… Concluir selecionadas", use_container_width=True, type="primary", disabled=not selected_ids):
         applied, denied, blocked = _demandas_apply_batch(filtered, selected_ids, username, role, "concluir", observacao="")
         if applied:
-            st.toast("✅ Demandas concluídas com sucesso")
+            st.toast("âœ… Demandas concluÃ­das com sucesso")
         if denied:
-            st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+            st.warning("Algumas demandas nÃ£o foram alteradas porque pertencem a outro responsÃ¡vel.")
         if blocked:
-            st.warning("Algumas demandas estão bloqueadas.")
+            st.warning("Algumas demandas estÃ£o bloqueadas.")
         if applied:
             st.rerun()
     quick_action_right.markdown(
-        f"<div class='muted-text' style='padding-top:0.45rem;'>Selecionadas: <strong>{selected_count}</strong>. As demais ações ficam no bloco recolhido abaixo.</div>",
+        f"<div class='muted-text' style='padding-top:0.45rem;'>Selecionadas: <strong>{selected_count}</strong>. As demais aÃ§Ãµes ficam no bloco recolhido abaixo.</div>",
         unsafe_allow_html=True,
     )
 
-    with st.expander(f"Ações nas selecionadas ({selected_count})", expanded=False):
+    with st.expander(f"AÃ§Ãµes nas selecionadas ({selected_count})", expanded=False):
         action_left, action_center, action_right = st.columns([1.0, 1.0, 2.4], vertical_alignment="center")
         justification = action_center.text_input(
             "Justificativa para desmarcar",
             key="demandas_justificativa",
-            placeholder="Explique por que está desmarcando.",
+            placeholder="Explique por que estÃ¡ desmarcando.",
         )
         observation_text = action_right.text_area(
-            "Observação para selecionadas",
+            "ObservaÃ§Ã£o para selecionadas",
             key="demandas_observacao_text",
             height=72,
-            placeholder="Escreva uma observação curta para aplicar nas demandas selecionadas.",
+            placeholder="Escreva uma observaÃ§Ã£o curta para aplicar nas demandas selecionadas.",
         )
-        if action_center.button("↩️ Desmarcar selecionadas", use_container_width=True):
+        if action_center.button("â†©ï¸ Desmarcar selecionadas", use_container_width=True):
             if not selected_ids:
                 st.warning("Selecione ao menos uma demanda na tabela.")
             elif not justification.strip():
-                st.error("Explique por que está desmarcando.")
+                st.error("Explique por que estÃ¡ desmarcando.")
             else:
                 applied, denied, blocked = _demandas_apply_batch(
                     filtered,
@@ -2590,15 +2656,15 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                     justificativa=justification,
                 )
                 if applied:
-                    st.toast("↩️ Demandas desmarcadas com sucesso")
+                    st.toast("â†©ï¸ Demandas desmarcadas com sucesso")
                 if denied:
-                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                    st.warning("Algumas demandas nÃ£o foram alteradas porque pertencem a outro responsÃ¡vel.")
                 if blocked:
-                    st.warning("Algumas demandas estão bloqueadas.")
+                    st.warning("Algumas demandas estÃ£o bloqueadas.")
                 if applied:
                     st.session_state["demandas_justificativa"] = ""
                     st.rerun()
-        if action_right.button("▶️ Marcar em andamento", use_container_width=True):
+        if action_right.button("â–¶ï¸ Marcar em andamento", use_container_width=True):
             if not selected_ids:
                 st.warning("Selecione ao menos uma demanda na tabela.")
             else:
@@ -2611,18 +2677,18 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                     observacao=observation_text,
                 )
                 if applied:
-                    st.toast("▶️ Demandas marcadas como em andamento")
+                    st.toast("â–¶ï¸ Demandas marcadas como em andamento")
                 if denied:
-                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                    st.warning("Algumas demandas nÃ£o foram alteradas porque pertencem a outro responsÃ¡vel.")
                 if blocked:
-                    st.warning("Algumas demandas estão bloqueadas.")
+                    st.warning("Algumas demandas estÃ£o bloqueadas.")
                 if applied:
                     st.rerun()
         if action_right.button("Salvar observacoes", use_container_width=True):
             if not selected_ids:
                 st.warning("Selecione ao menos uma demanda na tabela.")
             elif not observation_text.strip():
-                st.error("Informe uma observação para aplicar.")
+                st.error("Informe uma observaÃ§Ã£o para aplicar.")
             else:
                 applied, denied, blocked = _demandas_apply_batch(
                     filtered,
@@ -2635,9 +2701,9 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
                 if applied:
                     st.toast("Observacoes aplicadas com sucesso")
                 if denied:
-                    st.warning("Algumas demandas não foram alteradas porque pertencem a outro responsável.")
+                    st.warning("Algumas demandas nÃ£o foram alteradas porque pertencem a outro responsÃ¡vel.")
                 if blocked:
-                    st.warning("Algumas demandas estão bloqueadas.")
+                    st.warning("Algumas demandas estÃ£o bloqueadas.")
                 if applied:
                     st.rerun()
 
@@ -2648,7 +2714,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 ACTIVE_PAGES = {
     "Home": {"label": "Home", "renderer": render_home},
     "Empresas": {"label": "Empresas", "renderer": render_empresas},
-    "Demandas": {"label": "📋 Demandas", "renderer": render_demandas},
+    "Demandas": {"label": "ðŸ“‹ Demandas", "renderer": render_demandas},
 }
 
 
@@ -2677,4 +2743,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
