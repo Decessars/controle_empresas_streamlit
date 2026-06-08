@@ -2139,6 +2139,7 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
             .sort_values(["_demanda_ordem", "_demanda_texto", "Empresa"], kind="mergesort")
             .drop(columns=["_demanda_ordem", "_demanda_texto"])
         )
+    preselected_ids = {str(value) for value in st.session_state.get("demandas_selected_ids", []) if str(value).strip()}
     if FORCE_NATIVE_GRID or not AGGRID_AVAILABLE:
         fallback_columns = [col for col in grid_df.columns if col not in hidden_order and col != "data_limite"]
         fallback = grid_df[fallback_columns].copy()
@@ -2195,7 +2196,17 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
 
     builder = GridOptionsBuilder.from_dataframe(grid_df)
     builder.configure_default_column(sortable=False, filter=True, resizable=True, floatingFilter=True, editable=False)
-    builder.configure_selection("multiple", use_checkbox=True, header_checkbox=True)
+    pre_selected_rows = [
+        idx
+        for idx, demanda_id in enumerate(grid_df["demanda_id"].astype(str).tolist())
+        if demanda_id in preselected_ids
+    ]
+    builder.configure_selection(
+        "multiple",
+        use_checkbox=True,
+        header_checkbox=True,
+        pre_selected_rows=pre_selected_rows,
+    )
     builder.configure_pagination(paginationAutoPageSize=False, paginationPageSize=100)
     builder.configure_grid_options(
         rowHeight=36,
@@ -2372,11 +2383,17 @@ def _render_demandas_grid_aggrid(df: pd.DataFrame) -> list[str]:
     selected_rows = response.get("selected_rows", [])
     if isinstance(selected_rows, pd.DataFrame):
         if selected_rows.empty or "demanda_id" not in selected_rows.columns:
+            st.session_state["demandas_selected_ids"] = []
             return []
-        return selected_rows["demanda_id"].astype(str).tolist()
+        selected_ids = selected_rows["demanda_id"].astype(str).tolist()
+        st.session_state["demandas_selected_ids"] = selected_ids
+        return selected_ids
     if not selected_rows:
+        st.session_state["demandas_selected_ids"] = []
         return []
-    return [str(row.get("demanda_id", "")) for row in selected_rows if row.get("demanda_id", "")]
+    selected_ids = [str(row.get("demanda_id", "")) for row in selected_rows if row.get("demanda_id", "")]
+    st.session_state["demandas_selected_ids"] = selected_ids
+    return selected_ids
 
 
 def _render_selected_demand_panel(df: pd.DataFrame, selected_ids: list[str]) -> None:
