@@ -2428,6 +2428,8 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
 
     if "demandas_only_mine" not in st.session_state:
         st.session_state["demandas_only_mine"] = False
+    if "demandas_hide_concluidas" not in st.session_state:
+        st.session_state["demandas_hide_concluidas"] = False
     if "demandas_status_filter" not in st.session_state:
         st.session_state["demandas_status_filter"] = "Todos"
 
@@ -2438,7 +2440,7 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     empresa_options = ["Todas"] + sorted([v for v in view["empresa"].astype(str).unique().tolist() if v.strip()])
     tipo_options = ["Todos"] + sorted([v for v in view["tipo_demanda"].astype(str).unique().tolist() if v.strip()])
 
-    filter_cols = st.columns([1.0, 1.02, 1.08, 1.08, 1.35, 0.75, 0.72, 0.85], vertical_alignment="bottom")
+    filter_cols = st.columns([1.0, 1.02, 1.08, 1.08, 1.35, 0.78, 1.08, 0.78, 0.85], vertical_alignment="bottom")
     competencia = filter_cols[0].selectbox(
         "Competência",
         competencias_options or [competence_default],
@@ -2462,7 +2464,15 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
     if filter_cols[6].button("👥 Todas", use_container_width=True, type="primary" if not st.session_state.get("demandas_only_mine") else "secondary"):
         st.session_state["demandas_only_mine"] = False
         st.rerun()
-    if filter_cols[7].button("🔄 Recarregar", use_container_width=True):
+    hide_concluidas = st.session_state.get("demandas_hide_concluidas", False)
+    if filter_cols[7].button(
+        "🙈 Ocultar Concluídas" if not hide_concluidas else "👁️ Mostrar Concluídas",
+        use_container_width=True,
+        type="primary" if hide_concluidas else "secondary",
+    ):
+        st.session_state["demandas_hide_concluidas"] = not hide_concluidas
+        st.rerun()
+    if filter_cols[8].button("🔄 Recarregar", use_container_width=True):
         load_demandas_web.clear()
         load_marcacoes_web.clear()
         st.rerun()
@@ -2481,6 +2491,8 @@ def render_demandas(empresas: pd.DataFrame, demandas: pd.DataFrame, competencia_
         filtro_mask &= view["tipo_demanda"].astype(str).eq(tipo)
     if st.session_state.get("demandas_only_mine"):
         filtro_mask &= view["minha_demanda"]
+    if st.session_state.get("demandas_hide_concluidas"):
+        filtro_mask &= view["status"].astype(str).ne("concluida")
 
     filtered = view.loc[filtro_mask].copy()
     if filtered.empty:
